@@ -40,8 +40,11 @@ Accordingly **none** of the following is claimed verified:
 
 Parsing compose.yaml or running corresponding native binaries does not verify
 these properties. Documented Compose startup was not run because the runtime is
-unavailable. Run it on a Docker-enabled machine before treating that setup path
-as tested. Remote GitHub Actions has also not been run here.
+unavailable. Native Compose startup therefore remains untested on this workstation.
+However, [GitHub Actions run 41355405807](https://github.com/aee4/mustaaaaaard-27/actions/runs/41355405807)
+did build and exercise the production image with isolated PostgreSQL/MinIO on Linux;
+see [Linux container verification](linux-container-verification.md). That does not
+replace a local Compose test or prove hosted production behavior.
 
 ## Commands actually run and results
 

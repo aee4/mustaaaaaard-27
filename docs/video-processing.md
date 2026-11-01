@@ -117,13 +117,16 @@ Artifacts: `.tools/free-tier/windows-720-remux-cpu01.json` and
 `windows-720-remux-final-cpu01.json` and `windows-720-high-remux-cpu01.json`.
 These are representative workloads, not an
 exhaustive CPU/codec adversarial benchmark. Windows Job committed memory differs
-from Linux RSS/cgroup accounting. **Docker is unavailable and WSL has no installed
-Linux distribution. Linux 512 MiB/0.1 CPU execution and the image build remain
-pending; no Render resource compatibility or deployment is claimed.** Repeat the
+from Linux RSS/cgroup accounting. Docker is unavailable and WSL has no installed
+Linux distribution on this workstation; however,
+[GitHub Linux run 41355405807](https://github.com/aee4/mustaaaaaard-27/actions/runs/41355405807)
+built the image and passed the 512 MiB/no-swap/0.1 CPU cgroup gate with a 356,626,432
+byte peak and zero OOM events. **No Render resource compatibility or deployment is
+claimed.** Repeat the
 Linux workload and inspect cgroup peak/OOM events using
 [the deployment guide](free-tier-deployment.md#resource-findings-and-deployment-gate)
 before provisioning. No services or R2 were activated.
 
 A [manual GitHub Actions container gate](linux-container-verification.md) is now
-prepared for a Linux runner without local Docker/WSL. It has not been dispatched;
-adding the workflow does not change the pending Linux status.
+prepared for a Linux runner without local Docker/WSL. The first storage-free public
+repository run passed; the workflow still provides the repeatable Linux gate.

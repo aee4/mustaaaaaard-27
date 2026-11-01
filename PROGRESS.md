@@ -1,5 +1,25 @@
 # Progress
 
+## Linux container verification passed — 2026-11-01
+
+[Manual run 41355405807](https://github.com/aee4/mustaaaaaard-27/actions/runs/41355405807)
+completed successfully on the intended public repository. It built the root production
+image and ran isolated PostgreSQL/MinIO, migrations, and **130** backend/integration
+tests successfully. The application container was actually constrained by Linux
+cgroup v2 to 536,870,912 bytes, no swap, and `cpu.max=10000 100000` (0.1 CPU).
+Its highest recorded whole-cgroup memory peak was 356,626,432 bytes; `oom` and
+`oom_kill` remained zero.
+
+Initial readiness was 37.81 s; restart readiness was 16.58 s. Synthetic maximum
+30-second 720p landscape, portrait, and H.264 High uploads succeeded in 28.59 s,
+29.16 s, and 72.53 s. Chromium playback succeeded for those outputs plus VP8/Opus
+and VP9/Vorbis media; unsigned media was denied (403). Invalid-media retry,
+busy-processor handling, FFmpeg-child SIGKILL recovery with the same idempotency
+key, replay uniqueness, and app-container restart recovery all passed. Artifact
+publishing was disabled, so no Actions artifact storage was used; sanitized evidence
+was reviewed from the job log. This verifies the approximate Linux target gate, not
+actual Render behavior, Neon/R2 networking, Google OAuth, or physical phones.
+
 ## GitHub publication in progress — 2026-11-01
 
 User supplied https://github.com/aee4/mustaaaaaard-27. Confirmed empty/public repo,
@@ -14,7 +34,9 @@ Standard public hosted compute is free; account billing/usage API returned 404,
 so artifact storage cannot be confirmed. Added optional artifact publishing
 (default false), with sanitized reports in job logs/summary for a storage-free run.
 No paid usage/billing changes, hosting deployment or R2 activation are authorized.
-Commits/push and actual Linux results will be recorded after execution.
+The repository was published as a sequence of focused commits and the Linux result
+is recorded above. No paid Actions setting, hosting deployment, R2 activation, or
+Fly.io change was made.
 
 ## Manual Linux container verification prepared — 2026-11-01
 
@@ -52,15 +74,12 @@ fixtures and both WebM variants, with real signed playback and unsigned GET=403.
 These helper runs used **unconstrained native Windows services/Chrome**, not Linux
 containers. Existing working data and services were preserved.
 
-**Not dispatched; Linux remains unverified.** This folder has no Git metadata or
-remote; `gh` is signed out, and the connected GitHub app exposes only an unrelated
-repository. Actions eligibility/remaining allowance cannot be confirmed for the
-intended project. No unrelated repository was changed and no CI URL exists. Exact
-free-usage checks, UI/CLI trigger commands and evidence review steps are in
-[docs/linux-container-verification.md](docs/linux-container-verification.md).
-No WSL/system installation, cloud provisioning, R2 activation, paid usage or Fly.io
-changes occurred. A future CI pass approximates target resource limits; it does
-not prove actual Render performance, Neon/R2 access, Google consent or phone support.
+This historical preparation note predates publication and dispatch. The actual
+storage-free run is recorded above and in
+[docs/linux-container-verification.md](docs/linux-container-verification.md). No
+WSL/system installation, cloud provisioning, R2 activation, paid usage or Fly.io
+changes occurred. The CI pass approximates target resource limits; it does not prove
+actual Render performance, Neon/R2 access, Google consent or phone support.
 
 ## Approved 720p video remux — 2026-11-01
 

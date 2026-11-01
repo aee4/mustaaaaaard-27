@@ -47,12 +47,11 @@ a provider-enforced spending cap.
 
 ## Resource findings and deployment gate
 
-Docker is unavailable and WSL has no installed distribution. Thus a Linux
-512 MiB cgroup / 0.1 CPU run and the Docker build remain **unverified**.
-The [manual GitHub Linux container workflow](linux-container-verification.md) now
-provides that gate without installing local Docker/WSL. It has not been dispatched;
-repository association/account allowance access is unavailable. A successful future
-CI run approximates the target and does not establish actual Render performance.
+Docker is unavailable and WSL has no installed distribution on this workstation.
+However, [manual GitHub Linux run 41355405807](https://github.com/aee4/mustaaaaaard-27/actions/runs/41355405807)
+successfully built the production image and passed the 512 MiB/no-swap/0.1 CPU
+cgroup gate without installing Docker/WSL locally. That CI run approximates the
+target and does not establish actual Render performance.
 
 Supporting Windows tests did run the real backend/FFmpeg process tree in a Job
 configured with 512 MiB committed-memory limit, and a CPU-rate cap approximating

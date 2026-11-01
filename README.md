@@ -7,7 +7,7 @@ Nothing has been deployed.
 The current deployment target is **Render Free (one React/FastAPI origin) + Neon
 Free + private R2 Standard**. Configuration is prepared in render.yaml and the root
 Dockerfile. The approved 720p remux path passed supporting Windows resource tests;
-deployment still awaits **Linux 512 MiB/0.1 CPU verification** and account setup. R2's
+deployment still awaits account setup. R2's
 free allowance is not a hard spending cap; activation needs explicit approval.
 See [the free-tier handoff](docs/free-tier-deployment.md) for actual stress results,
 account eligibility limits, exact secret/Google setup and Linux verification steps.
@@ -16,7 +16,10 @@ No paid resources or production accounts have been configured.
 Linux verification can run on GitHub's standard Ubuntu runner without local Docker:
 see [the manual container workflow](docs/linux-container-verification.md) for free
 allowance checks, exact trigger steps, resource metrics, artifacts and current
-limitations. The workflow has been prepared, **not run**; Linux remains unverified.
+limitations. [Run 41355405807](https://github.com/aee4/mustaaaaaard-27/actions/runs/41355405807)
+successfully exercised the production image on Linux under that 512 MiB/0.1 CPU
+approximation. This is not a deployment or proof of Render, R2, Google OAuth, or
+physical-phone compatibility.
 
 Cloudflare hosting compatibility, current costs and provider-domain authentication
 tradeoffs are recorded in [docs/cloudflare-evaluation.md](docs/cloudflare-evaluation.md).

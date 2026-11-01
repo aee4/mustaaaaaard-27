@@ -10,10 +10,27 @@ JSON is retained in job logs/summary without artifact upload. Enable artifact
 publishing only after confirming included storage. No billing settings are changed.
 Earlier access limitations below describe the preparation session.
 
-**Status on 2026-11-01: prepared and locally checked, not run on Linux.**
+**Status on 2026-11-01: [run 41355405807](https://github.com/aee4/mustaaaaaard-27/actions/runs/41355405807) passed on Linux.**
 This is verification only: no deployment, image registry push, hosting resources,
 R2 subscription or paid usage is configured. No WSL installation/system change is
 needed on the Windows workstation. The existing push/PR workflows are unchanged.
+
+## Actual Linux result
+
+The successful manual job built the production image, used PostgreSQL/MinIO test
+services, and passed all 130 backend/integration tests. The entire application
+cgroup had `memory.max=536870912`, `memory.swap.max=0`, and
+`cpu.max=10000 100000` (0.1 CPU). Its highest recorded memory peak was
+356,626,432 bytes, with zero `oom` and `oom_kill` events.
+
+Initial readiness was 37.81 s and post-restart readiness 16.58 s. The synthetic
+30-second 720p landscape, portrait, and H.264 High fixtures were accepted in
+28.59 s, 29.16 s, and 72.53 s respectively; Chromium playback passed, and each
+unsigned media request was denied with 403. VP8/Opus and VP9/Vorbis playback also
+passed. Invalid-media, FFmpeg-child-SIGKILL, busy-processor, idempotent replay,
+and application-restart recovery all passed. This is Linux cgroup evidence only:
+it approximates the target and does not prove actual Render performance, hosted
+storage/network behavior, Google OAuth, or physical-device compatibility.
 
 ## What the job checks
 
@@ -93,10 +110,11 @@ remain separate checks. Do not provision simply because a workflow was added.
 
 ## Trigger without paid usage
 
-Repository access is currently missing: this working folder has no `.git` metadata
-or remote, `gh auth status` reports signed out, and the connected GitHub app exposes
-only an unrelated repository. No workflow was uploaded/dispatched, no billing
-settings were changed, and no free account quota could be inspected.
+The workflow was run once on the intended public repository with
+`publish_artifacts=false`, so no artifact storage was used. The immutable run logs
+contain the sanitized reports. The instructions below remain useful for a future
+manual rerun; do not enable paid usage or artifact publishing without confirming
+the account's policy and included storage.
 
 1. **Before pushing or running**, use the intended repository owner's GitHub
    **Settings → Billing and licensing → Usage / Budgets and alerts** (labels may
@@ -132,8 +150,9 @@ settings were changed, and no free account quota could be inspected.
    gh run download RUN_ID --repo OWNER/REPO --name linux-container-verification --dir .tools/linux-verify/download
    ```
 
-5. Require the **job** to complete successfully, not be skipped. Download the
-   `linux-container-verification` artifact. Both `container.json` and
+5. Require the **job** to complete successfully, not be skipped. If
+   `publish_artifacts=true`, download the `linux-container-verification` artifact;
+   otherwise inspect the sanitized reports in the run log/summary. Both `container.json` and
    `integration.json` must say `passed: true`; inspect cgroup peaks/OOM, HTTP timings,
    every playback/recovery result and all integration test outcomes. A placeholder
    `workflow_not_completed` report or missing evidence is not a pass. Record the run

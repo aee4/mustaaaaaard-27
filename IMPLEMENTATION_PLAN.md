@@ -101,7 +101,7 @@ Optional caption support is now explicitly authorized for local acceptance.
    - [x] Synthetic codec/portrait/rotation/metadata tests, real signed browser playback and regression checks.
    - [x] Three maximum-size landscape/portrait Windows process-tree runs at 512 MiB/approximate 0.1 CPU, including H.264 High/B-frames.
    - [x] Update specification, frontend contract, phone checklist and deployment evidence.
-   - [ ] Linux cgroup/image gate: pending a Linux runner; manual GitHub Actions is prepared in phase 17.
+   - [x] Linux cgroup/image gate: [manual CI run 41355405807](https://github.com/aee4/mustaaaaaard-27/actions/runs/41355405807) passed under the approximate target limit; Render remains a separate deployment gate.
 
 17. Manual Linux container gate without local Docker
    - [x] Inspect existing Actions and repository access; preserve existing push/PR workflows.
@@ -109,5 +109,6 @@ Optional caption support is now explicitly authorized for local acceptance.
    - [x] Whole-cgroup 512 MiB/no-swap/0.1 CPU limits, maximum 720p workload, browser playback and recovery assertions.
    - [x] Sanitized small artifacts, explicit free-allowance acknowledgement and exact trigger documentation.
    - [x] Local syntax/schema, helper and native HTTP/browser checks; no WSL/system changes.
+   - [x] Dispatch and review the storage-free public-repository run: production image, PostgreSQL/MinIO integration, cgroup evidence, playback and recovery all passed (run 41355405807).
    - [ ] Dispatch/inspect actual Linux run after the intended repository and free allowances are available.
    - [ ] Record run URL/commit and real counters before marking Linux verified; actual Render remains separate.
