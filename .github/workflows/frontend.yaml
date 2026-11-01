@@ -48,7 +48,9 @@ jobs:
       - run: uv run --directory backend python -m scripts.init_storage
       - run: uv run --directory backend alembic upgrade head
       - run: uv run --directory backend python -m app.cli bootstrap-admin --subject dev:alice --display-name Alice
-      - run: uv run --directory backend uvicorn app.main:app --host 127.0.0.1 --port 58000 --no-access-log > /tmp/mustard-api.log 2>&1 &
+      # A long-lived `uv run` holds the cache lock and makes setup-uv's post-job
+      # prune time out. Use the already locked/synced environment directly.
+      - run: cd backend && .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 58000 --no-access-log > /tmp/mustard-api.log 2>&1 &
       - run: npm run dev --prefix frontend > /tmp/mustard-web.log 2>&1 &
       - run: npx --prefix frontend playwright install --with-deps chromium
       - run: npm run test:e2e --prefix frontend
