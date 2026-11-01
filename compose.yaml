@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: mustard
+      POSTGRES_PASSWORD: mustard
+      POSTGRES_DB: mustard
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mustard -d mustard"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  minio:
+    build:
+      context: ./backend
+      dockerfile: docker/minio.Dockerfile
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: mustard-local
+      MINIO_ROOT_PASSWORD: mustard-local-password
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    volumes: ["minio-data:/data"]
+  storage-init:
+    build: ./backend
+    env_file: .env
+    environment:
+      S3_ENDPOINT: http://minio:9000
+    depends_on: [minio]
+    command: ["uv", "run", "--no-sync", "python", "-m", "scripts.init_storage"]
+  migrate:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://mustard:mustard@postgres:5432/mustard
+    command: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    depends_on:
+      postgres: {condition: service_healthy}
+  api:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://mustard:mustard@postgres:5432/mustard
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      storage-init: {condition: service_completed_successfully}
+volumes:
+  postgres-data:
+  minio-data:

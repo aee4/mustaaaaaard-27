@@ -1,0 +1,53 @@
+# Preparation only: no resources have been created. R2 acknowledgement stays false.
+services:
+  - type: web
+    name: mustaaaaaard-27
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    autoDeployTrigger: "off"
+    healthCheckPath: /health
+    maxShutdownDelaySeconds: 240
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEV_AUTH
+        value: "false"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: RUN_RELEASE_ON_START
+        value: "true"
+      - key: CLEANUP_WHILE_AWAKE
+        value: "true"
+      - key: MEDIA_CONCURRENCY
+        value: "1"
+      - key: FFMPEG_THREADS
+        value: "1"
+      - key: STORAGE_QUOTA_BYTES
+        value: "8000000000"
+      - key: STORAGE_OBJECT_QUOTA
+        value: "10000"
+      - key: R2_BILLING_ACKNOWLEDGED
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_BUCKET
+        value: mustaaaaaard-production
+      - key: S3_REGION
+        value: auto
+      - key: MEDIA_URL_SECONDS
+        value: "120"
