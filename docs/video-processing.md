@@ -16,10 +16,18 @@ the new 720p acceptance limit; the server does not resize oversized input.
 
 Now the pipeline is: bounded original-byte hashing → existing idempotent claim →
 processing admission → forced local-only container probe → codec/layout/resolution
-checks → full bounded decode-to-null → decoded timing check → stream-copy remux →
+checks → full bounded decode/frame-CRC timing → decoded timing check → stream-copy remux →
 output timing/size check → existing quota reservation/private PUT/atomic acceptance.
-There is **no video encoder or conversion fallback**. Decode validation is retained:
+There is **no compressed video encoder or conversion fallback**. Decode validation is retained:
 copying packets by itself cannot establish that compressed content is valid.
+
+The first Ubuntu 24.04 CI run exposed that FFmpeg 6 progress reports can stop at
+the last frame's presentation timestamp (4.9s for a valid 5s/10fps clip), while
+newer versions include its duration. Validation now reads decoded frame-CRC
+timestamps/durations with the source rational time base and passthrough timing,
+including the last frame, instead of using progress. The exact 5–30s comparisons
+remain unchanged. Checksums/timing stay internal and are never uploaded as logs.
+[FFmpeg frame-CRC format](https://ffmpeg.org/ffmpeg-formats.html#framecrc).
 
 | Input container | Accepted picture encoding | Optional audio | Output |
 |---|---|---|---|

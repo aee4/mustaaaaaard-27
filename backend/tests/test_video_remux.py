@@ -82,7 +82,7 @@ def test_remux_formats_dimensions_and_privacy(
     remux = next(args for args in calls if "copy" in args)
     assert remux[remux.index("-c") + 1] == "copy"
     assert not any("libx264" in args or "libx265" in args for args in calls)
-    assert any("null" in args and "-xerror" in args for args in calls)
+    assert any("framecrc" in args and "-xerror" in args for args in calls)
     probed = json.loads(
         original(
             [
@@ -234,8 +234,8 @@ def test_decoded_timing_cannot_be_replaced_by_container_duration(
     original = media.command
 
     def short_decode(args, timeout):
-        if "-progress" in args:
-            return b"frame=40\nout_time_us=4000000\nprogress=end\n"
+        if "framecrc" in args:
+            return b"#tb 0: 1/1\n0,0,0,4,1,0x00000000\n"
         return original(args, timeout)
 
     monkeypatch.setattr(media, "command", short_decode)
@@ -243,3 +243,14 @@ def test_decoded_timing_cannot_be_replaced_by_container_duration(
         media.sanitize_video(source, tmp_path, video_config)
     assert exc.value.code == "invalid_duration"
     assert not (tmp_path / "sanitized.mp4").exists()
+
+
+@pytest.mark.parametrize("frames,valid", [(49, False), (50, True), (300, True), (301, False)])
+def test_decoded_duration_includes_last_frame_without_relaxing_boundaries(frames, valid):
+    timing = "#tb 0: 1/10\n" + "".join(f"0,{n},{n},1,1,0x00000000\n" for n in range(frames))
+    if valid:
+        media.validate_decoded_timing(timing.encode())
+    else:
+        with pytest.raises(Problem) as exc:
+            media.validate_decoded_timing(timing.encode())
+        assert exc.value.code == "invalid_duration"

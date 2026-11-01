@@ -2,6 +2,7 @@ import hashlib
 import json
 import subprocess
 import warnings
+from fractions import Fraction
 from pathlib import Path
 from typing import BinaryIO
 
@@ -178,6 +179,39 @@ def video_demuxer(source: Path) -> str:
     raise Problem(422, "invalid_media", "Only MP4/WebM video supported")
 
 
+def validate_decoded_timing(decoded: bytes) -> None:
+    """Frame CRC records include the last frame's duration, unlike old progress PTS."""
+    try:
+        time_base = None
+        first = end = None
+        for line in decoded.decode("ascii").splitlines():
+            if line.startswith("#tb 0:"):
+                time_base = Fraction(line.split(":", 1)[1].strip())
+            elif line and not line.startswith("#"):
+                fields = line.split(",")
+                if int(fields[0]) != 0:
+                    continue  # audio is decoded too; container checks bound its duration
+                pts, duration = int(fields[2]), int(fields[3])
+                require(duration > 0, 422, "invalid_media", "Decoded frame duration is invalid")
+                first = pts if first is None else min(first, pts)
+                end = pts + duration if end is None else max(end, pts + duration)
+        require(
+            time_base is not None and time_base > 0 and first is not None and end is not None,
+            422,
+            "invalid_media",
+            "Video has no decoded timing",
+        )
+        assert time_base is not None and first is not None and end is not None
+        require(
+            5 <= (end - first) * time_base <= 30,
+            422,
+            "invalid_duration",
+            "Decoded video must be 5–30 seconds",
+        )
+    except (IndexError, ValueError, ZeroDivisionError, UnicodeError) as exc:
+        raise Problem(422, "invalid_media", "Video decoding could not be validated") from exc
+
+
 def sanitize_video(source: Path, directory: Path, config: Settings) -> tuple[Path, str]:
     demuxer = video_demuxer(source)
     raw = command(
@@ -220,6 +254,8 @@ def sanitize_video(source: Path, directory: Path, config: Settings) -> tuple[Pat
             "Unsupported stream layout",
         )
         video = videos[0]
+        video_time_base = Fraction(video["time_base"])
+        require(video_time_base > 0, 422, "invalid_media", "Invalid video time base")
         mp4 = demuxer == "mov"
         require(
             video["codec_name"] in ({"h264"} if mp4 else {"vp8", "vp9"})
@@ -249,7 +285,7 @@ def sanitize_video(source: Path, directory: Path, config: Settings) -> tuple[Pat
             "Video must be at most 720p (1280 x 720 landscape or 720 x 1280 portrait). "
             "Record with this app or export at 720p; the server does not resize videos.",
         )
-    except (KeyError, ValueError, TypeError) as exc:
+    except (KeyError, ValueError, TypeError, ZeroDivisionError) as exc:
         raise Problem(422, "invalid_media", "Invalid video metadata") from exc
     # Decode every selected stream: remuxing alone does not validate compressed
     # frames. Stop at 31s for untrusted/missing duration headers, then separately
@@ -285,27 +321,17 @@ def sanitize_video(source: Path, directory: Path, config: Settings) -> tuple[Pat
             "-t",
             "31",
             "-nostats",
-            "-stats_period",
-            "10",
-            "-progress",
-            "pipe:1",
+            "-fps_mode",
+            "passthrough",
+            "-enc_time_base:v",
+            str(video_time_base),
             "-f",
-            "null",
+            "framecrc",
             "-",
         ],
         120,
     )
-    try:
-        progress = dict(line.split("=", 1) for line in decoded.decode().splitlines() if "=" in line)
-        require(int(progress["frame"]) > 0, 422, "invalid_media", "Video has no decoded frames")
-        require(
-            5_000_000 <= int(progress["out_time_us"]) <= 30_000_000,
-            422,
-            "invalid_duration",
-            "Decoded video must be 5–30 seconds",
-        )
-    except (KeyError, ValueError, UnicodeError) as exc:
-        raise Problem(422, "invalid_media", "Video decoding could not be validated") from exc
+    validate_decoded_timing(decoded)
     output = directory / ("sanitized.mp4" if mp4 else "sanitized.webm")
     command(
         [
