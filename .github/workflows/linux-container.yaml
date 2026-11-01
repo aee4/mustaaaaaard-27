@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       free_allowance_confirmed:
-        description: "I checked Actions minutes/storage and a stop-usage budget; this run fits free allowances"
+        description: "Public standard runner is free, or included compute is confirmed; storage checked if publishing artifacts"
         type: boolean
         required: true
         default: false
