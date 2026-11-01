@@ -1,0 +1,42 @@
+name: Backend checks
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: mustard
+          POSTGRES_PASSWORD: mustard
+          POSTGRES_DB: mustard_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mustard -d mustard_test"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://mustard:mustard@localhost:5432/mustard_test
+      TEST_DATABASE_URL: postgresql+psycopg://mustard:mustard@localhost:5432/mustard_test
+      TEST_S3_ENDPOINT: http://localhost:9000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.12"
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --project backend --locked
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: docker build -f backend/docker/minio.Dockerfile -t mustard-minio ./backend
+      - run: docker run -d --name mustard-minio -p 127.0.0.1:9000:9000 -e MINIO_ROOT_USER=mustard-local -e MINIO_ROOT_PASSWORD=mustard-local-password mustard-minio server /data
+      - run: uv run --directory backend python -m scripts.init_storage
+      - run: uv run --directory backend ruff check .
+      - run: uv run --directory backend ruff format --check .
+      - run: uv run --directory backend mypy app
+      - run: uv run --directory backend alembic upgrade head
+      - run: uv run --directory backend alembic check
+      - run: uv run --directory backend pytest -q
+      - run: uv run --directory backend alembic downgrade base
+      - run: uv run --directory backend alembic upgrade head
+      - run: uv run --directory backend alembic check

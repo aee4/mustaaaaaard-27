@@ -1,0 +1,54 @@
+name: Frontend checks
+on: [push, pull_request]
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: mustard
+          POSTGRES_PASSWORD: mustard
+          POSTGRES_DB: mustard_frontend_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mustard -d mustard_frontend_test"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://mustard:mustard@localhost:5432/mustard_frontend_test
+      DEV_AUTH: "true"
+      BASE_URL: http://localhost:3000
+      API_TARGET: http://127.0.0.1:58000
+      VITE_DEV_LOGIN: "true"
+      PW_BROWSER_CHANNEL: chromium
+      AUTH_RATE: "1000"
+      INVITE_RATE: "1000"
+      UPLOAD_RATE: "1000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.12"
+          python-version: "3.13"
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --project backend --locked
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm ci --prefix frontend
+      - run: npm run lint --prefix frontend
+      - run: npm run typecheck --prefix frontend
+      - run: npm test --prefix frontend
+      - run: npm run build --prefix frontend
+      - run: docker build -f backend/docker/minio.Dockerfile -t mustard-minio ./backend
+      - run: docker run -d --name mustard-minio -p 127.0.0.1:9000:9000 -e MINIO_ROOT_USER=mustard-local -e MINIO_ROOT_PASSWORD=mustard-local-password mustard-minio server /data
+      - run: uv run --directory backend python -m scripts.init_storage
+      - run: uv run --directory backend alembic upgrade head
+      - run: uv run --directory backend python -m app.cli bootstrap-admin --subject dev:alice --display-name Alice
+      - run: uv run --directory backend uvicorn app.main:app --host 127.0.0.1 --port 58000 --no-access-log > /tmp/mustard-api.log 2>&1 &
+      - run: npm run dev --prefix frontend > /tmp/mustard-web.log 2>&1 &
+      - run: npx --prefix frontend playwright install --with-deps chromium
+      - run: npm run test:e2e --prefix frontend

@@ -1,0 +1,120 @@
+name: Linux container verification (manual, no deployment)
+
+on:
+  workflow_dispatch:
+    inputs:
+      free_allowance_confirmed:
+        description: "I checked Actions minutes/storage and a stop-usage budget; this run fits free allowances"
+        type: boolean
+        required: true
+        default: false
+      publish_artifacts:
+        description: "Upload reports only if included artifact storage has been confirmed; otherwise use job summary/logs"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-container-verification
+  cancel-in-progress: false
+
+jobs:
+  linux-container:
+    if: ${{ inputs.free_allowance_confirmed }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      COMPOSE_PROJECT_NAME: mustard-linux-check
+      COMPOSE_FILE: compose.resource.yaml:compose.linux-verification.yaml
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+psycopg://mustard:mustard-test-only@127.0.0.1:55432/mustard_linux_test
+      TEST_DATABASE_URL: postgresql+psycopg://mustard:mustard-test-only@127.0.0.1:55432/mustard_linux_test
+      S3_ENDPOINT: http://127.0.0.1:59000
+      TEST_S3_ENDPOINT: http://127.0.0.1:59000
+      S3_BUCKET: mustard-ci-integration
+      PW_BROWSER_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Initialize safe result directory
+        run: |
+          mkdir -p .tools/linux-verify/artifacts
+          printf '%s\n' '{"passed":false,"stage":"workflow_not_completed"}' > .tools/linux-verify/artifacts/container.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.12"
+          python-version: "3.13"
+          enable-cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install locked runner tools and synthetic browser
+        run: |
+          uv sync --project backend --locked
+          npm ci --prefix frontend
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          cd frontend
+          npx playwright install --with-deps chromium
+      - name: Check backend verification tooling
+        run: |
+          uv run --directory backend ruff check .
+          uv run --directory backend ruff format --check .
+      - name: Validate and build production image plus local test services
+        run: |
+          docker compose config --quiet
+          docker compose build --pull
+          test "$(docker info --format '{{.CgroupVersion}}')" = 2
+      - name: Start isolated PostgreSQL and private MinIO
+        run: |
+          docker compose up -d --wait postgres storage
+          docker compose run --rm storage-init
+          docker compose exec -T postgres createdb -U mustard mustard_linux_test
+          uv run --directory backend python -m scripts.init_storage
+          uv run --directory backend alembic upgrade head
+          uv run --directory backend alembic check
+      - name: Relevant real-service integration and video tests
+        run: uv run --directory backend pytest -q --junitxml=../.tools/linux-verify/integration-raw.xml
+      - name: Generate synthetic maximum-size 720p and browser fixtures
+        run: |
+          uv run --directory backend python -m scripts.prepare_resource_media
+          cd frontend
+          node scripts/prepare-camera.mjs
+      - name: Start full production image with test-only auth on loopback
+        run: docker compose up -d app
+      - name: Whole-container 512 MiB / 0.1 CPU, playback and recovery gate
+        run: |
+          uv run --directory backend python -m scripts.linux_container_verify --container "$(docker compose ps -q app)" --report ../.tools/linux-verify/artifacts/container.json
+      - name: Publish sanitized test outcomes and summary
+        if: always()
+        run: |
+          if [ -f .tools/linux-verify/integration-raw.xml ]; then
+            uv run --directory backend python -m scripts.ci_summary ../.tools/linux-verify/integration-raw.xml ../.tools/linux-verify/artifacts/integration.json
+          fi
+          printf '%s\n' 'Download linux-container-verification for cgroup peaks/limits/OOM counters, per-upload HTTP times, readiness probes, playback and recovery results.' 'A successful Linux run approximates the target; it does not prove Render performance, real Google OAuth or physical-phone compatibility.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain sanitized reports in non-artifact logs and job summary
+        if: always()
+        run: |
+          for report in .tools/linux-verify/artifacts/*.json; do
+            printf '\n%s\n' "$(basename "$report")"
+            cat "$report"
+            printf '\n### %s\n```json\n' "$(basename "$report")" >> "$GITHUB_STEP_SUMMARY"
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+            printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+          done
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && inputs.publish_artifacts }}
+        with:
+          name: linux-container-verification
+          path: .tools/linux-verify/artifacts/*.json
+          retention-days: 3
+          if-no-files-found: error
+          # The directory is ignored/hidden; only this explicit JSON allowlist is uploaded.
+          include-hidden-files: true
+      - name: Stop and remove only the isolated CI stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans

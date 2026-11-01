@@ -1,0 +1,10 @@
+# Add only to the isolated compose.resource.yaml stack, never production Compose.
+services:
+  postgres:
+    ports: ["127.0.0.1:55432:5432"]
+  storage:
+    ports: ["127.0.0.1:59000:9000"]
+  app:
+    environment:
+      # Sign for the runner/browser, while PUT/HEAD use the private Docker network.
+      S3_PUBLIC_ENDPOINT: http://127.0.0.1:59000
