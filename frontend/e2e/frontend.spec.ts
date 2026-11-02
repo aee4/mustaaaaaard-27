@@ -209,7 +209,7 @@ test('removed membership produces a real backend permission denial', async ({ pa
     await member.getByRole('button', { name: 'Join with invite', exact: true }).click()
     await member.getByLabel('Invite token or link').fill(invite.token)
     await member.getByRole('button', { name: 'Join your people' }).click()
-    await expect(member.getByLabel('Your group')).toBeVisible()
+    await expect(member.getByLabel('Your group')).toHaveValue(group)
     const user = (await (await member.request.get('/api/auth/session')).json()).user.id
     const response = await page.request.delete(`/api/groups/${group}/members/${user}`, { headers })
     expect(response.status()).toBe(200)

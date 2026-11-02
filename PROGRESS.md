@@ -43,6 +43,11 @@ before CSRF tour completion, use a unique friend name after interrupted earlier 
 Initial expected failures also caught stale schema readiness/old no-comments test.
 Physical Android/iPhone camera, keyboard and safe-area checks remain pending.
 Deployment and private original-photo import follow only after successful CI.
+First remote backend CI passed, including migration round trip. Frontend CI passed
+11/12 browser tests; membership-revocation test raced its own join completion after
+the old section-label assertion was removed. Replaced the premature selector-visible
+check with confirmed selected group UUID before revocation; deployment waits for
+the corrected CI run. No production action taken during this gate.
 
 ## Photo quality and gallery release deployed — 2026-11-02
 
