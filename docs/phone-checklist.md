@@ -65,10 +65,15 @@ for the following private-LAN procedure.
 - [ ] Grant/deny camera and microphone; recover from denial without reloading the app.
 - [ ] Photo: front/back device selection as supported by the browser, portrait/landscape,
   preview, retake, cancel and accepted upload. Confirm tracks stop on cancel/leave.
+- [ ] Still-photo quality: check actual native still or fallback frame dimensions,
+  fine detail and aspect ratio on both phones. Confirm best-effort 1080p photo
+  request is independent of video, and low-resolution fallback is not upscaled.
+  Exercise unsupported/rejected ImageCapture, portrait EXIF and high-resolution
+  gallery originals. Automated synthetic camera checks do not verify this hardware.
 - [ ] Video: supported MIME negotiation, 5s minimum, automatic stop near 29s, sound,
   orientation, preview and playback after server sanitation. Try backgrounding/locking
   the phone during recording; discard/retry safely if the browser pauses timers.
-- [ ] Check best-effort 720p/30fps capture and actual accepted dimensions in both
+- [ ] Check best-effort 720p/30fps video capture and actual accepted dimensions in both
   orientations. Play H.264/AAC-LC MP4 and VP8/VP9 WebM across both phones; older
   Safari may not support WebM. Confirm >720p, HEVC/HDR and native MOV are rejected
   clearly, with no conversion. Exported gallery videos earn 0 points. See

@@ -105,7 +105,8 @@ export function upload(plan: UploadPlan, onProgress: (value: number) => void): P
     xhr.onerror = xhr.ontimeout = () => reject(new ApiError(0, 'upload_unknown',
       'Connection lost. Acceptance may have completed. Retry these same bytes with the same key to check.'))
     const form = new FormData()
-    form.append('file', plan.file, plan.kind === 'photo' ? 'photo.png' : 'video.webm')
+    const extension = plan.file.type.startsWith('image/jpeg') ? 'jpg' : plan.file.type.startsWith('image/webp') ? 'webp' : plan.file.type.startsWith('video/mp4') ? 'mp4' : plan.kind === 'photo' ? 'png' : 'webm'
+    form.append('file', plan.file, `${plan.kind}.${extension}`)
     if (plan.caption) form.append('caption', plan.caption)
     xhr.send(form)
   })

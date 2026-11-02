@@ -68,7 +68,16 @@ to either capture or gallery endpoint with Idempotency-Key (1..128 characters).
 The server hashes bounded original bytes, claims a staged upload, validates/sanitizes,
 writes a random private object and atomically accepts the post/consumes capture.
 Image maximum: 15 MiB, 40 million pixels, 12000px each axis; JPEG/PNG/WebP only,
-single-frame; served as metadata-free JPEG or PNG. Video maximum: 50 MiB, duration
+single-frame; served as metadata-free lossless PNG without resizing or further
+lossy recompression, preserving decoded pixels and EXIF-corrected aspect ratio.
+Browser photos request flexible 1920x1080 preview independently of video. Prefer
+ImageCapture.takePhoto at supported still dimensions within existing safety limits;
+retain its encoded bytes unchanged. If unavailable/failing, capture only the
+stream's intrinsic videoWidth/videoHeight with one high-quality JPEG encode (0.95),
+never CSS preview dimensions or upscaling. Device resolution is best effort, not
+a guarantee. Gallery uploads preserve selected file bytes, have their own visible
+photo/video chooser, and retain preview/caption/progress/error/same-key retry.
+Video maximum: 50 MiB, duration
 5..30 seconds inclusive. New uploads accept at most 720p: shorter encoded edge
 <=720px and longer edge <=1280px, allowing landscape and portrait. MP4 requires
 8-bit yuv420p H.264 Baseline/Constrained Baseline/Main/High and optional AAC-LC audio;

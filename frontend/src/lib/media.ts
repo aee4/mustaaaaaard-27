@@ -1,4 +1,6 @@
 import type { Kind } from '../api/client'
+export const IMAGE_MAX_PIXELS = 40_000_000
+export const IMAGE_MAX_DIMENSION = 12000
 export const GALLERY_LABEL = 'Sharing only · 0 points'
 export const scoreLabel = (source: string, points: number) => source === 'gallery' ? GALLERY_LABEL : `+${points} ${points === 1 ? 'point' : 'points'}`
 export function recordingMime(): string | null {
@@ -12,7 +14,7 @@ export async function validateFile(blob: Blob, kind: Kind): Promise<void> {
   if (kind === 'photo') {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(blob.type)) throw new Error('Choose a JPEG, PNG or WebP image.')
     const image = await createImageBitmap(blob)
-    const valid = image.width * image.height <= 40_000_000 && Math.max(image.width, image.height) <= 12000
+    const valid = image.width * image.height <= IMAGE_MAX_PIXELS && Math.max(image.width, image.height) <= IMAGE_MAX_DIMENSION
     image.close()
     if (!valid) throw new Error('Image must be at most 40 million pixels and 12000 pixels per side.')
   } else {

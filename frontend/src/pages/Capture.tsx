@@ -5,6 +5,7 @@ import { Camera, Check, Film, ImagePlus, Info, RotateCcw, Square, UploadCloud, X
 import { api, ApiError, upload, type Capture, type Group, type Kind, type UploadPlan } from '../api/client'
 import { Countdowns, ErrorBox } from '../components/Common'
 import { GALLERY_LABEL, recordingMime, validateFile } from '../lib/media'
+import { captureStill, openCameraStream } from '../lib/photo'
 import { serverNow } from '../lib/time'
 
 export function CapturePage({ group, onDirty }: { group: Group; onDirty: (value: boolean) => void }) {
@@ -20,6 +21,7 @@ export function CapturePage({ group, onDirty }: { group: Group; onDirty: (value:
   const [error, setError] = useState<unknown>(null)
   const [starting, setStarting] = useState(false)
   const [validating, setValidating] = useState(false)
+  const [takingPhoto, setTakingPhoto] = useState(false)
   const [recording, setRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [uploading, setUploading] = useState(false)
@@ -34,7 +36,7 @@ export function CapturePage({ group, onDirty }: { group: Group; onDirty: (value:
   const generation = useRef(0)
   const tries = useRef(0)
   const accepted = useRef(false)
-  const dirty = !!stream || !!plan || starting || uploading || validating
+  const dirty = !!stream || !!plan || starting || uploading || validating || takingPhoto
   const blocker = useBlocker(() => dirty && !accepted.current)
   const stopTracks = useCallback(() => {
     live.current?.getTracks().forEach(track => track.stop())
@@ -45,7 +47,7 @@ export function CapturePage({ group, onDirty }: { group: Group; onDirty: (value:
     if (recorder.current && recorder.current.state !== 'inactive') {
       recorder.current.onstop = null; recorder.current.stop()
     }
-    recorder.current = null; stopTracks(); setRecording(false); setElapsed(0); setStarting(false); setValidating(false)
+    recorder.current = null; stopTracks(); setRecording(false); setElapsed(0); setStarting(false); setValidating(false); setTakingPhoto(false)
     if (previewUrl.current) URL.revokeObjectURL(previewUrl.current)
     previewUrl.current = ''; setPreview('')
     setPlan(null); setCaption(''); setCapture(null); setError(null); setAttempted(false); setRetryAt(0); tries.current = 0
@@ -71,7 +73,7 @@ export function CapturePage({ group, onDirty }: { group: Group; onDirty: (value:
       if (kind === 'video' && !recordingMime()) throw new Error('This browser cannot record a supported MP4/WebM video. Try a photo or gallery sharing.')
       const session = await api.capture(group.id, kind)
       if (gen !== generation.current) return
-      const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 }, ...(kind === 'video' ? { frameRate: { ideal: 30, max: 30 } } : {}) }, audio: kind === 'video' })
+      const media = await openCameraStream(kind)
       if (gen !== generation.current) { media.getTracks().forEach(t => t.stop()); return }
       live.current = media; setCapture(session); setStream(media)
     } catch (e) {
@@ -92,16 +94,16 @@ export function CapturePage({ group, onDirty }: { group: Group; onDirty: (value:
     finally { if (gen === generation.current) setValidating(false) }
   }
   async function takePhoto() {
-    if (!video.current || !capture) return
+    const track = live.current?.getVideoTracks()[0]
+    if (!video.current || !capture || !track || takingPhoto) return
     const gen = generation.current
+    setTakingPhoto(true); setError(null)
     try {
-      const canvas = document.createElement('canvas')
-      canvas.width = video.current.videoWidth; canvas.height = video.current.videoHeight
-      if (!canvas.width || !canvas.height) throw new Error('The camera is still getting ready. Try again in a moment.')
-      canvas.getContext('2d')!.drawImage(video.current, 0, 0)
-      const file = await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not capture this photo.')), 'image/png'))
+      const file = await captureStill(video.current, track)
+      if (gen !== generation.current) return
       stopTracks(); await acceptPreview(file, capture, gen)
-    } catch (e) { setError(e) }
+    } catch (e) { if (gen === generation.current) setError(e) }
+    finally { if (gen === generation.current) setTakingPhoto(false) }
   }
   function startRecording() {
     if (!stream || !capture) return
@@ -164,11 +166,12 @@ export function CapturePage({ group, onDirty }: { group: Group; onDirty: (value:
   const expired = !!plan?.capture && remaining === 0
   const retryable = error instanceof ApiError && error.retryable
   return <><div className="page-heading capture-heading"><div><span className="eyebrow">BE HERE. KEEP A LITTLE OF IT.</span><h1>Make today <em>count.</em></h1><p>One photo. A few seconds. Something to remember.</p></div></div>
-    <div className="capture-layout"><section className="capture-workspace"><div className="tabs" role="group" aria-label="Upload source">
+    <div className="capture-layout"><section className="capture-workspace"><div className="tabs capture-sources" role="group" aria-label="Upload source">
       <button className={source === 'camera' ? 'selected' : ''} disabled={uploading || starting} aria-pressed={source === 'camera'} onClick={() => { if (dirty && !window.confirm('Discard this capture?')) return; clear(); setSource('camera') }}><Camera size={19} /> Camera</button>
-      <button className={source === 'gallery' ? 'selected' : ''} disabled={uploading || starting} aria-pressed={source === 'gallery'} onClick={() => { if (dirty && !window.confirm('Discard this capture?')) return; clear(); setSource('gallery') }}><ImagePlus size={19} /> Gallery · 0 pts</button>
+      <button className={source === 'gallery' ? 'selected' : ''} disabled={uploading || starting || takingPhoto} aria-pressed={source === 'gallery'} aria-label="Upload from gallery" onClick={() => { if (dirty && !window.confirm('Discard this capture?')) return; clear(); setSource('gallery') }}><ImagePlus size={19} /> Upload from gallery</button>
     </div>
     {source === 'gallery' && <div className="gallery-label"><ImagePlus size={17} /><strong>{GALLERY_LABEL}</strong><span>No points. No streak activity. Just a memory.</span></div>}
+    <div className="kind-switch" role="group" aria-label="Media kind"><button aria-pressed={kind === 'photo'} className={kind === 'photo' ? 'selected' : ''} disabled={dirty} onClick={() => { clear(); setKind('photo') }}>Photo</button><button aria-pressed={kind === 'video'} className={kind === 'video' ? 'selected' : ''} disabled={dirty} onClick={() => { clear(); setKind('video') }}>Video</button></div>
     <div className={`capture-view ${stream || preview ? 'has-media' : ''}`}>
       {stream ? <><video ref={video} autoPlay playsInline muted aria-label="Live camera preview" />{recording && <span className="recording-label"><span /> REC {elapsed.toFixed(1)}s / 29s</span>}</>
         : preview ? kind === 'photo' ? <img src={preview} alt="Your photo preview" /> : <video src={preview} controls playsInline preload="metadata" aria-label="Your video preview" />
@@ -177,13 +180,13 @@ export function CapturePage({ group, onDirty }: { group: Group; onDirty: (value:
           {source === 'camera' ? <button className="button yellow" onClick={() => void openCamera()} disabled={starting}>{starting ? 'Opening camera…' : 'Open camera'}<Camera size={17} /></button> : <label className="button yellow file-picker">Choose {kind}<input aria-label={`Choose gallery ${kind}`} type="file" accept={kind === 'photo' ? 'image/jpeg,image/png,image/webp' : 'video/mp4,video/webm'} onChange={e => { void choose(e.target.files?.[0]); e.target.value = '' }} /></label>}
         </div>}
     </div>
-    <div className="kind-switch" role="group" aria-label="Media kind"><button aria-pressed={kind === 'photo'} className={kind === 'photo' ? 'selected' : ''} disabled={dirty} onClick={() => { clear(); setKind('photo') }}>Photo</button><button aria-pressed={kind === 'video'} className={kind === 'video' ? 'selected' : ''} disabled={dirty} onClick={() => { clear(); setKind('video') }}>Video</button></div>
     {source === 'camera' && <p className="capture-point-note">Photo +1 · Video +3</p>}
     {validating && <p role="status" className="session-status">Checking your preview…</p>}
+    {takingPhoto && <p role="status" className="session-status">Taking your photo…</p>}
     {error != null && <ErrorBox error={error} />}
     {capture && <p className={`session-status ${remaining === 0 ? 'danger' : ''}`} role="status">{remaining ? `Capture session · ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')} remaining` : 'Capture session expired. Retake before submitting a new capture.'}</p>}
     {stream && <div className="capture-controls"><button className="icon-button" aria-label="Cancel capture" onClick={clear}><X size={24} /></button>
-      {kind === 'photo' ? <button className="shutter" aria-label="Take photo" onClick={() => void takePhoto()} disabled={!remaining}><Camera size={25} /></button>
+      {kind === 'photo' ? <button className="shutter" aria-label="Take photo" onClick={() => void takePhoto()} disabled={!remaining || takingPhoto}><Camera size={25} /></button>
         : recording ? <button className="shutter recording" aria-label="Stop recording" disabled={elapsed < 5.1} onClick={() => recorder.current?.stop()}><Square size={22} fill="currentColor" /></button>
           : <button className="shutter" aria-label="Start recording" onClick={startRecording} disabled={!remaining}><Film size={25} /></button>}
       <span>{kind === 'video' ? recording && elapsed < 5.1 ? `${Math.max(0, Math.ceil(5.1 - elapsed))}s minimum` : '5–30 seconds' : '+1 point'}</span></div>}

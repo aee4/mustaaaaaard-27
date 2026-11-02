@@ -122,6 +122,16 @@ links. Tokens are random and stored hashed, expire and can be revoked.
 
 ## Browser capture → acceptance
 
+Photos and video negotiate resolution separately: flexible 1920x1080 for photo
+previews, unchanged 1280x720/30fps video requests. Prefer ImageCapture.takePhoto
+with supported still dimensions bounded by the existing photo safety limits. Keep
+its original encoded Blob. On unsupported/failing devices use one JPEG 0.95 canvas
+encode at actual videoWidth/videoHeight; never use CSS dimensions or upscale.
+Backend sanitization orients and strips metadata into lossless PNG without resizing.
+The prominent Upload from gallery action supports Photo/Video selection above the
+preview, keeps original file bytes and reuses the established caption/progress/
+error/idempotent retry flow. Gallery remains 0 points and no streak activity.
+
 1. User chooses photo/video; obtain camera/microphone permissions. Browser camera
    access requires HTTPS, with localhost exceptions. Check browser codec support.
 2. Immediately before capture, `POST /groups/{g}/captures` with kind. Response:

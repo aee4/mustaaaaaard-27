@@ -145,3 +145,5 @@ textarea:focus { border-color: #a47709; }textarea:disabled { background: #f0ecdf
 /* One numeric system across rankings, scores, timing and upload feedback. */
 .stats strong, .rank-points, .place, .profile-totals b, .countdowns, .score-pill, .period-label, .progress, time { font-variant-numeric: tabular-nums; }
 .capture-workspace { min-width: 0; }.tabs button { min-width: 0; }
+.capture-sources button { min-height: 54px; padding: 10px 12px; line-height: 1.35; }
+.capture-sources button svg { flex-shrink: 0; }

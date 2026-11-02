@@ -54,7 +54,7 @@ test('two users join, capture photo/video, share gallery, see feed/ranks and mod
     await bob.getByRole('button', { name: 'Share this moment' }).click()
     await expect(bob.getByText('+3 points', { exact: true }).first()).toBeVisible()
     await nav(bob, 'Capture').click()
-    await bob.getByRole('button', { name: 'Gallery · 0 pts' }).click()
+    await bob.getByRole('button', { name: 'Upload from gallery' }).click()
     await expect(bob.getByText('Sharing only · 0 points', { exact: true }).first()).toBeVisible()
     const image = await bob.evaluate(async () => {
       const canvas = document.createElement('canvas'); canvas.width = canvas.height = 20
@@ -162,7 +162,7 @@ test('a lost acceptance response retries the same operation without a duplicate'
   })
   try {
     await nav(page, 'Capture').click()
-    await page.getByRole('button', { name: 'Gallery · 0 pts' }).click()
+    await page.getByRole('button', { name: 'Upload from gallery' }).click()
     const image = await page.evaluate(() => {
       const canvas = document.createElement('canvas'); canvas.width = canvas.height = 20
       const ctx = canvas.getContext('2d')!; const pixels = ctx.createImageData(20, 20)
