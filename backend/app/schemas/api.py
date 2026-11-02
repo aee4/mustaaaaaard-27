@@ -83,7 +83,7 @@ class CaptureOut(BaseModel):
 
 class PostOut(BaseModel):
     id: uuid.UUID
-    user_id: uuid.UUID
+    user_id: uuid.UUID | None
     group_id: uuid.UUID
     kind: str
     source: str
@@ -91,12 +91,62 @@ class PostOut(BaseModel):
     accepted_at: datetime
     removed: bool
     caption: str | None = Field(default=None, max_length=280)
+    title: str | None = None
+    pinned: bool = False
+    author_name: str | None = None
+    like_count: int = 0
+    liked: bool = False
+    comment_count: int = 0
+    album: list[uuid.UUID] = Field(default_factory=list)
+
+
+class CommentIn(Input):
+    text: str
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        value = value.replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not 1 <= len(value) <= 500 or any(
+            unicodedata.category(ch) in {"Cs", "Cc"} and ch not in "\n\t" for ch in value
+        ):
+            raise ValueError("Comment must contain 1–500 plain text characters")
+        return value
+
+
+class CommentOut(BaseModel):
+    id: uuid.UUID
+    author: UserOut
+    text: str | None
+    created_at: datetime
+    removed: bool
+
+
+class CommentsOut(BaseModel):
+    items: list[CommentOut]
+    next_cursor: str | None
+
+
+class EngagementOut(BaseModel):
+    liked: bool
+    like_count: int
+    comment_count: int
+
+
+class PinIn(Input):
+    pinned: bool
+
+
+class TourOut(BaseModel):
+    version: int
+    completed: bool
 
 
 class FeedOut(BaseModel):
     items: list[PostOut]
     next_cursor: str | None
     server_time: datetime
+    pinned: PostOut | None = None
 
 
 class StreakOut(BaseModel):

@@ -1,4 +1,5 @@
 from datetime import timedelta
+from pathlib import Path
 from uuid import UUID
 
 import typer
@@ -13,6 +14,22 @@ from app.services.identity import bootstrap
 from app.services.uploads import UploadService
 
 cli = typer.Typer(no_args_is_help=True, pretty_exceptions_show_locals=False)
+
+
+@cli.command("seed-welcome")
+def seed_welcome_command(
+    group_id: UUID = typer.Option(...),
+    operator_id: UUID = typer.Option(...),
+    photo: list[Path] = typer.Option(..., exists=True, dir_okay=False),
+) -> None:
+    """Import an ordered private album. First --photo is the cover; explicit initial group only."""
+    from app.services.welcome import seed_welcome
+
+    config = get_settings()
+    post = seed_welcome(
+        SessionLocal, S3Storage(config), config, Clock(), group_id, operator_id, photo
+    )
+    typer.echo(f"welcome_post={post}")
 
 
 @cli.command("bootstrap-admin")

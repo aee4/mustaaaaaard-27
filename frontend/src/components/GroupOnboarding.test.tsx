@@ -9,6 +9,7 @@ it('shows actionable no-group state and selects the created group on its feed', 
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   vi.spyOn(api, 'session').mockResolvedValue({ user: { id: 'user', display_name: 'Ama' }, csrf_token: 'csrf', expires_at: '2027-01-01' })
   vi.spyOn(api, 'groups').mockResolvedValue([])
+  vi.spyOn(api, 'tour').mockResolvedValue({ version: 1, completed: true })
   const created = { id: 'new-group', name: 'Our people', role: 'admin' }
   vi.spyOn(api, 'createGroup').mockResolvedValue(created)
   vi.spyOn(api, 'feed').mockResolvedValue({ items: [], next_cursor: null, server_time: '2026-11-01T12:00:00Z' })
@@ -24,7 +25,7 @@ it('shows actionable no-group state and selects the created group on its feed', 
   vi.mocked(api.groups).mockResolvedValue([created])
   fireEvent.click(screen.getByRole('button', { name: 'Create and open feed' }))
   await waitFor(() => expect(router.state.location.pathname).toBe('/'))
-  expect(await screen.findByRole('heading', { name: /Good days start/ })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: /first moment/ })).toBeVisible()
   expect(screen.getByLabelText('Your group')).toHaveValue('new-group')
   expect(api.createGroup).toHaveBeenCalledWith('Our people')
   client.clear()

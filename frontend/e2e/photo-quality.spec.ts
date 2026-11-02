@@ -6,6 +6,8 @@ async function enter(page: Page) {
   await page.getByLabel('Development ID').fill('quality-' + crypto.randomUUID())
   await page.getByLabel('Display name', { exact: true }).fill('Synthetic photo verification')
   await page.getByRole('button', { name: 'Enter the season' }).click()
+  await expect(page.getByLabel('Your group')).toBeVisible()
+  { const session = await (await page.request.get('/api/auth/session')).json(); await page.request.put('/api/me/tour/1', { headers: { Origin: 'http://localhost:3000', 'X-CSRF-Token': session.csrf_token } }); await page.reload() }
   await page.getByRole('button', { name: 'Create group', exact: true }).click()
   const name = 'Photo quality ' + crypto.randomUUID()
   await page.getByLabel('Group name').fill(name)

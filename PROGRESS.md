@@ -1,5 +1,460 @@
 # Progress
 
+## Private social redesign — 2026-11-02 (release preparation)
+
+Read the explicit pasted request, AGENTS/SPEC/progress and current capture/feed/
+media/auth/scoring implementation. Added migration 0004 without resetting data:
+system welcome/album posts, composite-key likes, retry-unique comments and account/
+version tour completion. Server membership/live-post/CSRF checks apply to every
+social operation. Post/membership locks fence mutation/removal races; likes set/
+unset idempotently, comment retries preserve hashes/tombstones and reject changed
+text. Trimmed plain text comments max500, keyset pagination, own deletion/admin
+moderation, 120 likes/min and 30 comment mutations/min. Scores/grace/video unchanged.
+
+Compact cream/mustard/Inter feed, outline hearts/comments, private welcome carousel,
+phone bottom sheet/desktop dialog, optimistic like rollback/rapid-tap protection,
+same-key comment retry, four-step keyboard-modal tour with account persistence and
+Profile replay. Tour pauses for dirty capture/upload, handles resize/scroll/missing
+targets and reduced motion. Detailed capture/ranking rules are under How it works.
+No notification/bookmark/comment-like placeholders. Public photo favicon replaced
+with a round geometric monogram; earlier photo bytes remain in preexisting Git
+history (not rewritten). New original photos never added to public assets/history.
+
+Explicit seed-welcome command accepts the real initial group ID and active admin,
+uses bounded lossless/metadata-stripping processing plus existing quota reservations,
+and keeps object IO outside transactions. Children are not separate feed entries.
+Repeat seed honors unpin/removal; whole-album deletion feeds normal object cleanup.
+Verified correct production group UUID bad0f3b9-c9ff-4c6f-a563-56575993e367 by exact
+existing name, one existing admin, no active posts. Render is Free/auto-deploy off;
+Google/storage secrets present and not printed. No production mutation yet.
+All 12 usable original photos exist; group selfie is the cover. Two screenshots
+with social-app UI excluded from the album. design-input/ ignored before copying.
+
+Backend Ruff/format/mypy passed; Alembic upgrade from 0003 over existing local
+browser-test data and schema drift check passed. 143 pytest passed, no skips,
+30.12s against real PostgreSQL/MinIO/FFmpeg (two upstream deprecation warnings).
+Frontend lint/types/build and 30 unit tests passed. All 12 real-backend browser tests
+passed in 33.8s; final four affected social/photo tests passed again in 11.9s after
+caption placement and explicit rollback/rapid-tap coverage. Synthetic high-res
+capture native/fallback remains 1920x1080, MAE0.01 vs downsampled720p59.36. Checked
+320/390/1440px synthetic screenshots, fixed nav overflow and desktop dialog center.
+No personal media in test screenshots/artifacts. Test harness fixes: wait for login
+before CSRF tour completion, use a unique friend name after interrupted earlier runs.
+Initial expected failures also caught stale schema readiness/old no-comments test.
+Physical Android/iPhone camera, keyboard and safe-area checks remain pending.
+Deployment and private original-photo import follow only after successful CI.
+
+## Photo quality and gallery release deployed — 2026-11-02
+
+Inspected capture/gallery/backend/feed before changing settings: photos shared
+the 1280x720 stream request with video; canvas already used intrinsic dimensions,
+gallery retained original bytes, backend was lossless PNG/no resize with EXIF
+orientation/metadata stripping, and feed served full images with contain rendering.
+Implemented flexible independent 1080p photo requests, bounded native still-photo
+capture where supported, default/settings/stream fallbacks, single JPEG 0.95 canvas
+encode at actual dimensions, no upscaling, pre-allocation bounds, and async capture
+cancel/double-click protection. Video constraints/rules and all scoring unchanged.
+Gallery now has a prominent Upload from gallery action and Photo/Video controls
+above the preview; original-byte/caption/progress/retry/error flow is preserved.
+Updated multipart extension handling and SPEC/integration/phone docs.
+
+Frontend lint/types/build and 30 unit tests passed. Backend Ruff/format/mypy passed;
+137 pytest tests passed, no skips, 27.36s, real PostgreSQL/MinIO/FFmpeg. Added 7
+high-resolution pixel/EXIF/metadata/limit tests. All 11 real-backend browser tests
+passed in 36.1s, plus rerun of affected 3 after final allocation guard. Synthetic
+chart output was 1920x1080 with error 0.00–0.01 versus 59.36–59.37 for a 720p
+downsampled baseline. Gallery lost-response retry/preview/caption/progress and
+photo/video zero points/no streak verified. Physical phones remain unverified.
+Initial new browser-fixture failures were fixed (emit canvas stream frames; wait
+for selected group before reading its ID), not app/backend defects.
+Detailed evidence in docs/photo-quality.md. Committed/pushed only this release as
+f8d5ba3355576f5e17b47eb656f06e0f57d32297. Backend and frontend GitHub CI both
+completed successfully. Render deploy dep-dbkchbc9v7es73cc7prg is live at
+https://mustaaaaaard-27.onrender.com; verified all environment values unchanged
+before/after deployment, plan Free, auto-deploy off. No schema/scoring/video rule
+or production secret change. Earlier unrelated local notes/config remain.
+
+Live production Chrome verification used a temporary session for the already
+verified existing owner and the existing isolated verification group, not a new
+identity or dev-auth route. Passed visible gallery action, 1920x1080 synthetic
+native capture/preview/upload=1 point, gallery JPEG/MP4 selection/preview/captions/
+uploads=0, signed video playback, ranking total=1 and mobile layout. Downloaded
+the gallery output only in memory: 1080x1920 EXIF-corrected portrait, pixel-identical
+to decoded original and metadata absent. Removed 3 accepted test posts and cleaned
+their 3 R2 objects after each production verification attempt; test sessions revoked,
+fingerprints/audit retained and existing user content/session preserved. The first
+production verification attempt reached ranking checks but its test harness lacked
+an API baseURL; fixed that harness and reran successfully, without application
+changes. Final /api/ready=200; existing production login Chrome check also passed.
+Synthetic tests are not physical Android/iPhone camera/focus/exposure verification.
+
+## Circular favicon update — 2026-11-02
+
+Updated the existing deterministic icon generator to apply an antialiased circular
+alpha mask and retain RGBA instead of flattening generated PNGs to RGB. Original
+supplied favicon.png is preserved. Regenerated 16/32px PNG, all ICO sizes, 180px
+Apple icon and 192/512px derivatives. Added versioned icon URLs so browsers can
+refresh cached square assets. Validated transparent corners/opaque centers in
+every PNG and ICO frame. Frontend lint/typecheck, all 20 unit tests and production
+build passed. No new tests or product scope added.
+
+Committed/pushed only the eight favicon-related source/assets as
+87d75ccb434f877b3e6946363d4595a6e223666d. Other deployment notes/config changes and
+ignored credentials were preserved outside that commit. Started pinned deployment
+dep-dbk8fh8u01pc739bpog0 on the existing Render service after verifying Free and
+auto-deploy off. Deployment is live. Verified all six generated icon files from
+provider HTTPS match the new local assets byte-for-byte and have transparent
+corners; versioned links are served and /api/ready=200. Existing production Chrome
+check passed against the live app. Latest backend/frontend CI was still running
+at the preceding status check; local required frontend checks all passed. No
+secret settings changed.
+
+## Production deployment and single-user acceptance passed — 2026-11-02
+
+Live URL: https://mustaaaaaard-27.onrender.com. User completed real Google sign-in;
+read-only DB verification found exactly one Google account with an active session.
+Ran existing bootstrap-user operator CLI for that verified existing user; initial
+Mustaaaaaard '27 group/admin bootstrap succeeded. No fabricated Google identity or
+development authentication was used. The original browser session was preserved.
+
+For authorized production acceptance, created a separate short-lived session for
+that same verified account using the existing login service, keeping its cookie/
+CSRF only in process memory. Created one clearly named Deployment verification
+2026-11-02 group and reused it for checks; normal initial-group content was not
+modified. Actual HTTPS API tests passed: missing CSRF rejected; capture photo=1;
+capture video=3; gallery photo=0; normalized CRLF/CR caption; idempotent replay
+returns same post; changed caption cannot evade original-media duplicate rejection;
+feed contains the three accepted posts; weekly/all-time rank 1 totals 4 with correct
+photo/video/gallery counts. Real R2 media signed GET=200 and range GET=206;
+unsigned GET rejected with 400. No cookie, credential, media bytes or signed URL
+was printed, saved in browser storage files or committed.
+
+An initial synthetic 2-second clip was correctly rejected by the existing 5–30s
+duration policy (422 invalid_duration). This was a verification-fixture mistake,
+not an app defect; the corrected 6-second H.264/AAC fixture passed. No app-code
+change or extra deployment was needed.
+
+Authenticated headless Chrome against the live Render site passed feed rendering,
+literal caption text (no injected b element), signed video playback (320px width,
+advancing time), 4-point leaderboard, and desktop width check. Browser used the
+temporary session, not automation of Google consent. User's real Google callback
+was independently verified above. Media/390x844 viewport were synthetic; physical
+Android/iPhone camera/microphone/recording behavior remains unverified. A second
+Google user/invite/membership flow has not been exercised on production.
+
+Removed every accepted verification post via production API: first-run photo plus
+three corrected-run posts. Existing cleanup service confirmed removal of the four
+associated R2 objects and released reservations. Post captions cleared, tombstones
+and original fingerprints retained. Final verification feed empty and rank points=0.
+Temporary sessions revoked, original Google session remains active. The empty
+verification group, audit history and failed/expired capture/upload records remain
+as intended; there is no group-delete API and none was invented.
+
+Live readiness, schema 0003, production dev-auth=404, frontend, Google sign-in,
+single-user live API scoring/feed/rankings and private media are verified. Source
+commit remains c241e769883b88b4dcbd5fc6ee3e5bfae515ebc0, Render plan Free,
+auto-deploy off. No paid plan, billing-method change, unrelated resource or Fly.io
+mutation occurred. Credentials remain ignored locally and in provider secrets.
+Physical phones, second-user acceptance and backup/restore rehearsal are pending.
+
+## Production app live; real Google sign-in pending — 2026-11-02
+
+Deploy dep-dbk87e49v7es73c0gaag completed live on existing Render Free service
+srv-dbk7ej942hec73ervp5g, main c241e769883b88b4dcbd5fc6ee3e5bfae515ebc0.
+Live origin: https://mustaaaaaard-27.onrender.com. Auto-deploy remains off; no
+paid plan, new checkout, unrelated resource or Fly.io change occurred.
+
+Actual provider HTTPS checks: /health=200, /api/ready=200 and /=200 HTML.
+Read-only Neon check confirms Alembic revision 0003; normal locked startup release
+performed migrations (not a manual schema mutation). Production POST /api/auth/dev
+returns 404; unauthenticated /api/auth/session returns 401. /auth/google returns
+302 to accounts.google.com with configured client, exact callback and openid
+scope. OAuth temporary cookie has Secure/HttpOnly/SameSite=Lax; no cookies or
+authorization URLs were printed. This verifies initiation, not user consent.
+
+Ran existing frontend `npm run test:production` against the real Render origin:
+passed on Chrome 156.0.8078.79. Verified exact page title, Google entry, disabled
+development form, icons, Inter font and license. Ignored login screenshot was
+saved by that existing script under frontend/test-results. This is synthetic
+desktop browser/390x844 viewport verification, not physical phone testing.
+Earlier live R2 temporary-object read/write/list/signed/range/CORS/private-denial
+and deletion checks remain passed. No app media upload has yet been performed.
+
+Asked user to complete real Google sign-in in their own browser and report only
+completion or safe error text. Actual consent/callback/session, initial owner
+bootstrap and authenticated upload/scoring/feed/rankings remain pending. Preserve
+that task scope; do not claim those flows passed based on HTTP readiness.
+
+## First production deployment started — 2026-11-02
+
+User saved the Google Web OAuth JSON to root .env.google-oauth.json. Confirmed
+it is ignored/untracked, parsed only in memory, and validated the client type,
+exact JavaScript origin and callback against https://mustaaaaaard-27.onrender.com.
+Transferred GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET through official per-variable
+Render PUT endpoints, then compared both values and all other environment variables
+in memory. Both credentials matched, other variables were unchanged, no deployment
+was triggered by transfer, and full native production Settings validation passed.
+No credential values appeared in output, documentation or tracked files; .env.*
+is also excluded from Docker build context.
+
+Removed the temporary Docker command with a narrowly scoped service PATCH;
+confirmed Free, Frankfurt, origin and /health were preserved and auto-deploy
+remains off. Started dep-dbk87e49v7es73c0gaag using existing service
+srv-dbk7ej942hec73ervp5g and main commit c241e769883b88b4dcbd5fc6ee3e5bfae515ebc0.
+Build is in progress. Normal Dockerfile startup will check storage and apply
+locked Alembic migrations before serving. No manual schema writes or dev data
+imports performed. Readiness/live UI and actual Google login remain pending.
+
+## Google management integration recheck — 2026-11-02
+
+At user's request, searched the live integration directory for Google Cloud OAuth
+and inspected current tools/configured MCP servers. No Google Cloud OAuth/consent
+management integration or browser/computer-control tool is exposed. Directory
+results were unrelated Workspace apps and unavailable BigQuery; installed none.
+Configured/authenticated MCP servers remain Neon, Render and Cloudflare. gcloud
+is not on PATH. Official Google remote-MCP authentication documentation requires
+an existing OAuth client for that sign-in route and does not provide a verified
+bootstrap route here. Do not claim all Google MCP implementations lack this
+feature; no suitable accessible integration was established in this environment.
+Earlier browser launch rejection remains in force; no attempt to circumvent it.
+
+The minimal remaining manual operation is Google Auth Platform consent registration
+and creation/download of this app's Web OAuth client, using the already confirmed
+Render origin/callback. Await .env.google-oauth.json (still absent) before secure
+credential transfer, app deployment and startup migrations. No provider resources,
+secrets or plan settings changed during this recheck.
+
+## Production connectivity verified; Google client creation pending — 2026-11-02
+
+Using only credentials already stored in Render, tested the dedicated R2 bucket
+with a unique temporary object outside media/. HEAD bucket, PUT, HEAD object,
+authenticated GET, prefix-scoped List, signed GET, signed byte-range GET (206)
+and exact-origin CORS all passed. Unsigned S3 GET was rejected with HTTP 400;
+do not describe it as a 403. Finally deleted the object and confirmed HEAD 404.
+No object bytes, credential values or signed URLs were printed or persisted.
+No user media was read or altered.
+
+Read production settings presence without printing values: only GOOGLE_CLIENT_ID
+and GOOGLE_CLIENT_SECRET are missing. Confirmed service is Free and startup guard
+remains set. Neon read-only connectivity passed over TLS, PostgreSQL 18; migration
+table is absent in the fresh database. No schema mutation performed. Initial DB
+probe used an unsupported connection-info attribute; corrected the probe to read
+pgconn.ssl_in_use and obtained the successful result above.
+
+User requested exact Google consent/client guidance and will download the client
+JSON locally for secure transfer. Verified root .env.google-oauth.json is already
+ignored by .env.*. Expected Web client origin:
+https://mustaaaaaard-27.onrender.com; callback:
+https://mustaaaaaard-27.onrender.com/auth/google/callback. Configure External
+Testing audience, intended test users, basic openid/email/profile scopes, and
+contact email; no billing or unrelated APIs needed. Awaiting the ignored JSON.
+Once supplied, validate its web client/origin/redirect and transfer only the two
+Google values via per-variable Render API updates, preserving all other settings.
+Then validate production settings, remove temporary dockerCommand, deploy existing
+Free service and verify startup migrations/readiness. Actual Google sign-in and
+authenticated upload/scoring/feed/rankings still pending; phone tests unverified.
+
+## Storage credentials transferred without deployment — 2026-11-02
+
+User explicitly supplied the S3 credentials and authorized writing them to local
+root .env and transferring them to the existing Render service. Neither root nor
+backend .env existed at the start. Wrote only the two requested S3 entries to root
+.env, verified it is Git-ignored and untracked, then updated the two individual
+Render environment variables through official per-variable PUT endpoints.
+Credential values were not printed or included in documentation or tracked files.
+Provider read-back matched both values; all other existing service environment
+variables were preserved. Deploy history before/after showed zero new deployments,
+and the setup startup guard remained in place. No app launch or commit occurred.
+Google OAuth credentials remain pending; actual storage/app verification remains.
+
+## Render/R2 provisioned; credential dashboard steps remain — 2026-11-02
+
+User explicitly approved R2 billing/overage exposure in the authorization response.
+This supersedes earlier pending-consent notes; do not request that consent again
+for this installation. Cloudflare and Render MCP authorization retries succeeded.
+Render requires its documented pre-registered OAuth client `codex`; generic/DCR
+login failed, then `codex mcp add Render --url https://mcp.render.com/mcp
+--oauth-client-id codex` worked. Render OAuth settings also exist in the user's
+global MCP config from that command. Render CLI 2.34.0 was installed outside the
+repo under LocalAppData/CodexDeploymentTools, and user approved device login.
+
+Verified account access with actual tool calls. Render workspace is My Workspace,
+ID tea-d0aejn95pdvs73cmvl40. Cloudflare account 8b158add944122fbd78f9d7ff7dbed01
+already had R2 storage, so no subscription checkout/payment changes were needed.
+Created only mustaaaaaard-production: Standard, WEUR, default jurisdiction.
+Verified managed r2.dev access disabled and zero custom domains. Set/read back
+CORS for https://mustaaaaaard-27.onrender.com: GET/HEAD, Range allowed, exposed
+Content-Range/Accept-Ranges/Content-Length/ETag, 3600s preflight cache.
+Existing services and bucket were not modified; no Fly.io access occurred.
+
+Render API rejected maxShutdownDelaySeconds=240 on Free (HTTP 400, no service).
+Removed this unsupported field from render.yaml and corrected dashboard docs.
+Created srv-dbk7ej942hec73ervp5g, mustaaaaaard-27, Free, Frankfurt, Docker root
+context and Dockerfile, main, auto-deploy off, /health. Confirmed allocated URL
+https://mustaaaaaard-27.onrender.com. To honor the no-app-launch gate, its temporary
+dockerCommand is `python -c "raise SystemExit('Deployment setup pending storage
+and Google OAuth')"`. This prevents app import/migrations even if a build starts.
+Restore dockerCommand to empty only after all production settings are complete.
+Canceled initial deploy dep-dbk7ek142hec73ervrd0. Generated SECRET_KEY directly
+into Render and transferred DATABASE_URL from Neon MCP to Render in memory,
+validated exact direct endpoint/database and TLS, never printed/written locally.
+Neon get_connection_string needs actual branch ID br-sparkling-hall-bartwbpd:
+passing main returned 404 despite its schema claiming name support.
+
+Render's MCP environment-update tool triggered deploy dep-dbk7fuec6qcc73don15g
+despite auto-deploy off. Canceled it, guard intact. Use direct API/save-only UI for
+further secret edits, not that MCP tool. Service read-back confirms Free/off/guard;
+only DATABASE_URL and SECRET_KEY of required secret keys were present at last
+check. Storage endpoint/bucket/quotas and R2_BILLING_ACKNOWLEDGED=true are set in
+Render under the received consent. Template render.yaml retains false by default.
+
+Cloudflare OAuth MCP explicitly returned 403 for /user/tokens/permission_groups
+and states no OAuth scope supports token management. Creating scoped S3 API
+credentials therefore needs the R2 API Tokens dashboard. User asked if automated:
+explained this verified limitation; never ask for keys in chat. Requested only
+creation of Object Read & Write token scoped to mustaaaaaard-production, with its
+two S3 values entered directly into Render Environment and Save only.
+GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET are also pending. Google web OAuth client
+must use origin https://mustaaaaaard-27.onrender.com and redirect exactly
+https://mustaaaaaard-27.onrender.com/auth/google/callback. Browser session from
+the previous turn was unreachable; automatic approval review rejected a fresh
+Chrome remote-debugging launch as blocked by policy. Do not circumvent this
+rejection. Unsupported OAuth console steps need user dashboard interaction.
+
+No application launch, production migration or real user acceptance occurred.
+Ruff check/format and mypy passed after the YAML correction. Backend pytest:
+49 passed, 81 skipped, two existing httpx deprecation warnings, 1.26s. Integration
+fixtures were not enabled in this invocation; it is not a fresh real-services pass.
+Latest unchanged-source GitHub backend/frontend/Linux evidence remains the full
+verification baseline. No frontend source changed. git diff --check passed.
+
+## Autonomous deployment takeover: authorization pending — 2026-11-02
+
+User authorized setup and deployment through integrations, then official CLI/API,
+then browser, while forbidding paid plans, unapproved R2 exposure and unrelated/
+Fly.io changes. Existing no-launch-until-storage/OAuth-ready gate remains intact.
+Rechecked live GitHub: latest backend 41356947713 and frontend 41356947772 remain
+successful at c241e769883b88b4dcbd5fc6ee3e5bfae515ebc0. No source changes required.
+
+Inspected live integration directory individually for Render, Cloudflare and
+Google Cloud. Render plugin is available but uninstalled/unconnected; invoked its
+connection suggestion under the user's explicit connection request. It has not
+been confirmed connected, and no account/workspace access is claimed. Neon plugin
+also exists but is unnecessary: existing local MCP still reports OAuth and the
+production project will be reused. No Cloudflare plugin was returned. Google
+results were unrelated Workspace apps/BigQuery, not an OAuth-management integration.
+
+Official Cloudflare docs identify https://mcp.cloudflare.com/mcp. Added that
+OAuth-only server to project .codex/config.toml and started `codex mcp login
+Cloudflare --oauth-client-registration dcr`. Browser authorization is pending;
+latest CLI status is Not logged in. This is account connection only, not R2
+activation. Requested explicit R2 billing approval with primary-payment-method,
+free-allowance, overage-rate and no-hard-spend-cap explanation; no decision received.
+R2 remains inactive and acknowledgement remains false.
+
+No gcloud, render or wrangler CLI was on PATH and no standard local gcloud,
+.render or .wrangler configuration directory was found. AWS CLI exists but does
+not establish Cloudflare access. Official Google documentation directs OAuth web
+client creation through Google Auth Platform. Opened a dedicated visible Chrome
+session through existing Playwright for that unsupported dashboard work, using a
+temporary browser profile outside the repo and loopback CDP port 9224. It is at
+Google sign-in (accounts.google.com); user sign-in is pending. No personal browser
+profile/cookies were read, no credential input or secret output captured, and no
+Google resources or billing changes occurred. Keep that browser open for continuation.
+
+Inspected official Render create-service OpenAPI in memory: no skip-initial-deploy
+or suspended-on-create field was found. Do not create a running service before
+storage and Google settings are ready. The service plan must explicitly be free:
+the API otherwise documents a paid default. Startup storage readiness precedes
+migrations. No service creation, deployments, production SQL, secret transfer,
+R2 operations or Fly.io access occurred. Next dependencies are Render connection,
+Cloudflare authorization, Google browser sign-in and the separate R2 consent
+decision. No application files changed; git diff --check was used for these notes.
+
+## Deployment resumed: MCP verified, Render prepared — 2026-11-02
+
+Verified Neon MCP rather than assuming CLI authentication applies. Initially
+`codex mcp list` reported Not logged in. The normal OAuth flow reached callback
+but failed token exchange with invalid_request / Invalid redirect URI. Retried
+`codex mcp login Neon --oauth-client-registration dcr`; user approved in browser
+and login succeeded. Fresh CLI listing reports OAuth. A separate read-only Codex
+app-server initialize + mcpServerStatus/list probe against the configured Neon URL
+reported name Neon, authStatus oAuth and 127 discovered tools. No model turn or
+sub-agent was launched, no SQL or database-credential tool called, and no database
+credentials were fetched/printed. Running chat tool availability has not refreshed;
+authenticated server discovery is verified, deployed app connectivity is not.
+
+Reviewed existing root Dockerfile, render.yaml, production env example, Settings
+validation and serve_web origin derivation. Added exact Render dashboard fields,
+public settings, secret transfer instructions, Google prerequisites and R2 billing
+exposure to docs/free-tier-deployment.md. Render's official docs confirm Create Web
+Service starts the first build/deploy even with later auto-deploys disabled: keep
+the form unsubmitted until storage and exact Google OAuth settings are ready.
+Environment updates on an existing service must use Save only. Render plugin is
+available but not connected (already suggested previously); no dashboard account
+or workspace eligibility was inspected. No Render resources or app launch occurred.
+
+Official Render, Cloudflare and Google guidance checked live. R2 requires subscription
+checkout; Cloudflare requires a primary payment method for product purchases. Free
+Standard allowances do not cap excess storage/operation billing; quotas and alerts
+do not bound signed-link replay or shared account usage. R2 approval remains absent,
+activation has not occurred and R2_BILLING_ACKNOWLEDGED remains false. No paid plan,
+billing change, Fly.io access, migrations or production bootstrap performed.
+Documentation-only updates passed git diff --check; app suites were not rerun.
+
+## Neon organization setup completed — 2026-11-02
+
+Followed the user-requested https://neon.com/get-started/prompt.md using Neon CLI
+8.16.0. Initial browser login expired; retry with `login --keyring` succeeded.
+OAuth session is in the Windows OS keyring, outside this repository. Read the
+organization API: Emmanuel Eyram Korku (`org-dark-mouse-16460218`) is Free and had
+no projects. Created exactly one empty project `mustaaaaaard-27-production`, ID
+`morning-shape-51677264`, AWS Frankfurt, PostgreSQL 18. Read back its project,
+branch, endpoint and database: `main`, `neondb`, `neondb_owner`, min=max 0.25 CU,
+1 GiB logical branch limit, six-hour history. Endpoint suspend timeout `0` means
+the plan default according to the live API description; Free's five-minute
+scale-to-zero is retained. No paid plan or billing setting changed.
+
+Linked `.neon` using `--no-env-pull --no-config`; CLI added `.neon` to .gitignore.
+No database password or connection URI was fetched or written. Existing root and
+backend environments were preserved; production DATABASE_URL still belongs in
+Render's secret manager. Installed project-local `neon` and `neon-postgres` skills
+from neondatabase/agent-skills with skills-lock.json. The CLI's first skill attempt
+required newer Node, and its retry hit a Windows npx invocation failure; direct
+skills installation with temporary npm Node 22.22.0 completed successfully without
+upgrading system Node 22.16.0. `neon init` configured OAuth MCP in .codex/config.toml
+at https://mcp.neon.tech/mcp. Agent restart/first-use MCP authorization remains;
+MCP tool connectivity is not claimed verified in this running session.
+
+Read-back verification and git diff --check passed. No application code/schema or
+deployment configuration changed, so application suites were not rerun. Database
+connectivity through the deployed app, migrations, Render, Google OAuth, R2 and
+physical devices remain unverified. R2 activation approval is still absent and
+R2_BILLING_ACKNOWLEDGED remains false. No deployment or local data import occurred.
+
+## Free-tier account setup preparation — 2026-11-02
+
+User authorized the documented Render Free / Neon Free / private R2 setup after
+Linux verification, one service at a time starting with Neon. Paid plans remain
+prohibited; R2 activation requires separate explicit overage approval, still absent.
+Read live GitHub main and latest workflow runs: local/remote HEAD both
+`c241e769883b88b4dcbd5fc6ee3e5bfae515ebc0`. Backend run 41356947713 succeeded
+at 2026-11-01 22:27:42 UTC; frontend run 41356947772 succeeded at 22:28:07 UTC.
+Read both job step lists: backend checks/tests/migration round-trip and frontend
+lint/types/unit/build/real-backend Chromium checks all passed. Camera was synthetic.
+Manual Linux run 41355405807 also remains successful, on earlier SHA 6ecab195;
+no claim of actual Render/Neon/R2/Google/physical-device verification is made.
+
+Reviewed root Dockerfile, render.yaml, production env example and two-connection
+SQLAlchemy pool. Corrected obsolete deployment blockers/repository statements and
+added exact Neon project/Connect field choices, PostgreSQL 18 matching CI, direct
+TLS, 0.25 CU and scale-to-zero guidance. Official Neon/R2 terms were checked live.
+No credentials requested, read or written; no resources, subscriptions, deployment,
+paid plans or billing changes performed. R2 acknowledgement remains false.
+Account eligibility, actual quotas and Neon project completion require dashboard
+confirmation. Documentation-only changes: checked diff/whitespace; no local test
+rerun, application/configuration unchanged. Latest CI evidence is recorded above.
+
 ## Linux container verification passed — 2026-11-01
 
 [Manual run 41355405807](https://github.com/aee4/mustaaaaaard-27/actions/runs/41355405807)

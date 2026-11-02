@@ -115,4 +115,4 @@ def test_openapi_has_explicit_contracts_and_no_frontend():
     schema = create_app(Settings()).openapi()
     assert "/groups/{group_id}/gallery" in schema["paths"]
     assert "PostOut" in schema["components"]["schemas"]
-    assert all("comments" not in path for path in schema["paths"])
+    assert "/groups/{group_id}/posts/{post_id}/comments" in schema["paths"]

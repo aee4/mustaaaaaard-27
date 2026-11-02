@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import week_bounds
 from app.core.errors import Problem, require
-from app.models.entities import Membership, Post, User
-from app.schemas.api import FeedOut, LeaderboardOut, RankOut, UserOut
+from app.models.entities import Comment, Membership, Post, User
+from app.schemas.api import FeedOut, LeaderboardOut, PostOut, RankOut, UserOut
+from app.services.engagement import counts
 from app.services.identity import audit, member
 from app.services.streaks import calculate
 from app.services.uploads import representation
@@ -25,7 +26,9 @@ def feed(
     secret: str,
 ) -> FeedOut:
     member(db, group, user)
-    stmt = select(Post).where(Post.group_id == group, Post.removed_at.is_(None))
+    stmt = select(Post).where(
+        Post.group_id == group, Post.removed_at.is_(None), Post.parent_id.is_(None)
+    )
     signer = URLSafeSerializer(secret, salt="feed")
     if cursor:
         try:
@@ -49,8 +52,60 @@ def feed(
         next_cursor = signer.dumps(
             {"group": str(group), "at": last.accepted_at.isoformat(), "id": str(last.id)}
         )
+    items = []
+    item: PostOut | None
+    for p in rows[:limit]:
+        item = representation(p)
+        engagement = counts(db, p.id, user)
+        item.like_count, item.liked, item.comment_count = (
+            engagement.like_count,
+            engagement.liked,
+            engagement.comment_count,
+        )
+        author = db.get(User, p.user_id) if p.user_id else None
+        item.author_name = author.display_name if author else "Group · Mustaaaaaard ’27"
+        item.album = list(
+            db.scalars(
+                select(Post.id)
+                .where(Post.parent_id == p.id, Post.removed_at.is_(None))
+                .order_by(Post.accepted_at, Post.id)
+            )
+        )
+        items.append(item)
+    # Pinned welcome content is returned separately on every page, not duplicated in items.
+    pinned = db.scalar(
+        select(Post)
+        .where(
+            Post.group_id == group,
+            Post.pinned.is_(True),
+            Post.parent_id.is_(None),
+            Post.removed_at.is_(None),
+        )
+        .limit(1)
+    )
+    if pinned and not any(p.id == pinned.id for p in items):
+        item = representation(pinned)
+        engagement = counts(db, pinned.id, user)
+        item.like_count, item.liked, item.comment_count = (
+            engagement.like_count,
+            engagement.liked,
+            engagement.comment_count,
+        )
+        item.author_name = "Group · Mustaaaaaard ’27"
+        item.album = list(
+            db.scalars(
+                select(Post.id)
+                .where(Post.parent_id == pinned.id, Post.removed_at.is_(None))
+                .order_by(Post.accepted_at, Post.id)
+            )
+        )
+    else:
+        item = next((p for p in items if p.pinned), None)
     return FeedOut(
-        items=[representation(p) for p in rows[:limit]], next_cursor=next_cursor, server_time=now
+        items=[p for p in items if not p.pinned],
+        pinned=item,
+        next_cursor=next_cursor,
+        server_time=now,
     )
 
 
@@ -78,7 +133,7 @@ def leaderboard(
         filters += [Post.accepted_at >= start, Post.accepted_at < end]
     scores = select(
         Post.user_id.label("user_id"),
-        func.sum(case((Post.source == "gallery", 0), (Post.kind == "photo", 1), else_=3)).label(
+        func.sum(case((Post.source != "capture", 0), (Post.kind == "photo", 1), else_=3)).label(
             "points"
         ),
         *[
@@ -162,12 +217,16 @@ def remove_post(
     )
     if post.removed_at is None:
         # Record elapsed grace before deletion; never erase or move history.
-        target = db.get(Membership, (group, post.user_id))
-        if target and target.removed_at is None:
+        target = db.get(Membership, (group, post.user_id)) if post.user_id else None
+        if target and target.removed_at is None and post.user_id is not None:
             calculate(db, group, post.user_id, now)
         post.removed_at = now
         post.caption = None
+        for child in db.scalars(select(Post).where(Post.parent_id == post.id)):
+            child.removed_at, child.caption = now, None
+        for comment in db.scalars(select(Comment).where(Comment.post_id == post.id)):
+            comment.removed_at, comment.text = now, None
         db.flush()
         audit(db, group, actor, "post.removed", str(post.id), now)
-        if target and target.removed_at is None:
+        if target and target.removed_at is None and post.user_id is not None:
             calculate(db, group, post.user_id, now)

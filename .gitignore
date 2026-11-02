@@ -40,3 +40,5 @@ pgdata/
 minio-data/
 .DS_Store
 Thumbs.db
+.neon
+design-input/

@@ -12,6 +12,10 @@ export type Capture = components['schemas']['CaptureOut']
 export type Media = components['schemas']['MediaOut']
 export type Invite = components['schemas']['InviteOut']
 export type Kind = 'photo' | 'video'
+export type Comment = components['schemas']['CommentOut']
+type Comments = components['schemas']['CommentsOut']
+type Engagement = components['schemas']['EngagementOut']
+type Tour = components['schemas']['TourOut']
 
 let csrf: string | null = null
 export function setCsrf(token: string | null) { csrf = token }
@@ -83,6 +87,13 @@ export const api = {
   invite: (g: string, max_uses: number) => request<Invite>(`/groups/${g}/invites`, { method: 'POST', body: JSON.stringify({ max_uses, expires_in_hours: 72 }) }),
   revoke: (g: string, id: string) => request(`/groups/${g}/invites/${id}`, { method: 'DELETE' }),
   removeMember: (g: string, u: string) => request(`/groups/${g}/members/${u}`, { method: 'DELETE' }),
+  like: (g: string, p: string, liked: boolean) => request<Engagement>(`/groups/${g}/posts/${p}/like`, { method: liked ? 'PUT' : 'DELETE' }),
+  comments: (g: string, p: string, cursor: string | null) => request<Comments>(`/groups/${g}/posts/${p}/comments?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+  comment: (g: string, p: string, text: string, key: string) => request<Comment>(`/groups/${g}/posts/${p}/comments`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ text }) }),
+  deleteComment: (g: string, p: string, id: string) => request(`/groups/${g}/posts/${p}/comments/${id}`, { method: 'DELETE' }),
+  pin: (g: string, p: string, pinned: boolean) => request(`/groups/${g}/posts/${p}/pin`, { method: 'PATCH', body: JSON.stringify({ pinned }) }),
+  tour: () => request<Tour>('/me/tour/1'),
+  completeTour: () => request<Tour>('/me/tour/1', { method: 'PUT' }),
 }
 
 export type UploadPlan = { group: string; kind: Kind; capture: Capture | null; file: Blob; key: string; caption?: string | null }

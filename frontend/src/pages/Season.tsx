@@ -8,6 +8,7 @@ import { Avatar, Countdowns, ErrorBox, Loading, Stats } from '../components/Comm
 import { ghanaDate, ghanaTime, syncTime } from '../lib/time'
 import { scoreLabel } from '../lib/media'
 import { SeasonSummary } from '../App'
+import { Album, SocialActions } from '../components/Social'
 
 export function PrivateMedia({ group, post }: { group: string; post: Post }) {
   const [failed, setFailed] = useState(false)
@@ -29,12 +30,11 @@ export function PrivateMedia({ group, post }: { group: string; post: Post }) {
 
 function PostCard({ post, group, session }: { post: Post; group: Group; session: Session }) {
   const qc = useQueryClient()
-  const author = useQuery({ queryKey: ['member', group.id, post.user_id], queryFn: () => api.profile(group.id, post.user_id), retry: false })
   const remove = useMutation({ mutationFn: () => api.remove(group.id, post.id), onSuccess: () => qc.invalidateQueries() })
-  const name = author.data?.user.display_name || `Member ${post.user_id.slice(0, 6)}`
+  const name = post.source === 'system' ? `${group.name} · Group` : post.author_name || 'Group member'
   return <article className="post-card"><header><Avatar name={name} /><div><h3>{name}</h3><time dateTime={post.accepted_at}>{ghanaTime(post.accepted_at)} · {ghanaDate(post.accepted_at)}</time></div>
     <span className={`score-pill ${post.source === 'gallery' ? 'gallery' : ''}`}>{scoreLabel(post.source, post.points)}</span></header>
-    <PrivateMedia group={group.id} post={post} />{post.caption && <p className="post-caption">{post.caption}</p>}<footer><span>{post.kind === 'video' ? <Film size={16} /> : <ImageIcon size={16} />}{post.source === 'gallery' ? 'From the gallery' : 'A little of today'}</span>
+    <>{post.title && <div className="welcome-title"><h2>{post.title}</h2><p>{post.caption}</p></div>}{post.source === "system" ? <Album group={group.id} post={post} /> : <PrivateMedia group={group.id} post={post} />}<SocialActions group={group} post={post} session={session} /></><footer><span>{post.kind === 'video' ? <Film size={16} /> : <ImageIcon size={16} />}{post.source === 'gallery' ? 'From the gallery' : 'A little of today'}</span>
       {(post.user_id === session.user.id || group.role === 'admin') && <button className="text-button danger" aria-label={`Remove post by ${name}`} disabled={remove.isPending} onClick={() => {
         if (window.confirm('Remove this moment? Its points and activity will be recalculated. The same file cannot earn points again.')) remove.mutate()
       }}><Trash2 size={15} />Remove</button>}</footer>{remove.isError && <ErrorBox error={remove.error} />}</article>
@@ -44,11 +44,12 @@ export function FeedPage({ group, session, rank }: { group: Group; session: Sess
   const feed = useInfiniteQuery(feedOptions(group.id))
   useEffect(() => { if (feed.data?.pages[0]) syncTime(feed.data.pages[0].server_time) }, [feed.data])
   const posts = feed.data?.pages.flatMap(page => page.items) || []
-  return <><div className="page-heading feed-page-heading"><div><span className="eyebrow">THE DAYS WE’LL TALK ABOUT</span><h1>Stay a little <em>longer.</em></h1><p>The ordinary moments. The extraordinary people.</p></div><Link className="button yellow desktop-capture" to="/capture"><Camera size={18} /> Make today count</Link></div>
-    <div className="feed-layout"><div className="feed-column"><div className="mobile-stats"><Stats rank={rank} /><Countdowns /></div>
-      <div className="section-label"><span>{feed.data?.pages[0] ? ghanaDate(feed.data.pages[0].server_time).toUpperCase() : 'THE GROUP JOURNAL'}</span><span className="live-dot">Private & just us</span></div>
+  const welcome = feed.data?.pages[0].pinned
+  return <><div className="page-heading feed-page-heading"><h1>Feed</h1><Link className="button yellow desktop-capture" to="/capture"><Camera size={18} />Share a moment</Link></div>
+    <div className="feed-layout"><div className="feed-column">
+      {welcome && <PostCard post={welcome} group={group} session={session} />}
       {feed.isPending && <Loading />}{feed.isError && <ErrorBox error={feed.error} retry={() => void feed.refetch()} />}
-      {!feed.isPending && !feed.isError && posts.length === 0 && <section className="empty panel"><div className="empty-icon"><Camera size={32} /></div><span className="eyebrow">THE FIRST PAGE IS YOURS</span><h2>Good days start<br />with a little moment.</h2><p>No posts yet. Capture something small, or share a memory from your gallery.</p><Link className="button yellow" to="/capture">Make the first memory <ArrowUpRight size={18} /></Link></section>}
+      {!feed.isPending && !feed.isError && posts.length === 0 && !welcome && <section className="empty panel"><div className="empty-icon"><Camera size={32} /></div><span className="eyebrow">THE FIRST PAGE IS YOURS</span><h2>Your group’s first moment</h2><p>No posts yet. Capture something small, or share a memory from your gallery.</p><Link className="button yellow" to="/capture">Make the first memory <ArrowUpRight size={18} /></Link></section>}
       {posts.map(post => <PostCard key={post.id} post={post} group={group} session={session} />)}
       {feed.hasNextPage && <button className="button load-more" disabled={feed.isFetchingNextPage} onClick={() => void feed.fetchNextPage()}>{feed.isFetchingNextPage ? 'Loading moments…' : 'A little further back'}<ArrowDown size={16} /></button>}
       {posts.length > 0 && !feed.hasNextPage && <p className="end-note">All caught up. Go make a memory.</p>}
@@ -64,7 +65,7 @@ export function LeaderboardPage({ group, session }: { group: Group; session: Ses
   const own = useQuery({ queryKey: ['own', group.id, session.user.id], queryFn: () => ownRank(group.id, session.user.id) })
   const moderation = useMutation({ mutationFn: (user: string) => api.removeMember(group.id, user), onSuccess: () => qc.invalidateQueries() })
   useEffect(() => { if (query.data) syncTime(query.data.server_time) }, [query.data])
-  return <><div className="page-heading leaderboard-heading"><div><span className="eyebrow">A LITTLE FRIENDLY COMPETITION</span><h1>The mustard <em>table.</em></h1><p>Show up. Share a moment. Keep the season going.</p></div><Trophy className="heading-icon" size={46} /></div>
+  return <><div className="page-heading leaderboard-heading"><div><h1>Leaderboard</h1></div><Trophy className="heading-icon" size={46} /></div>
     <div className="ranking-layout"><section><div className="tabs" role="group" aria-label="Leaderboard period"><button className={period === 'weekly' ? 'selected' : ''} aria-pressed={period === 'weekly'} onClick={() => { setPeriod('weekly'); setOffset(0) }}>Weekly</button><button className={period === 'all' ? 'selected' : ''} aria-pressed={period === 'all'} onClick={() => { setPeriod('all'); setOffset(0) }}>All time</button></div>
       {query.data && <p className="period-label">{query.data.period_start && query.data.period_end ? `${ghanaDate(query.data.period_start)} — ${ghanaDate(new Date(Date.parse(query.data.period_end) - 1).toISOString())}` : 'THE WHOLE FINAL SEASON'}</p>}
       {query.isPending && <Loading text="Setting the table…" />}{query.isError && <ErrorBox error={query.error} retry={() => void query.refetch()} />}
@@ -75,7 +76,7 @@ export function LeaderboardPage({ group, session }: { group: Group; session: Ses
         }}><Trash2 size={16} /></button>}</li>)}</ol>
       {query.data?.total === 0 && <div className="empty panel"><h2>A table for your people.</h2><p>Active group members will appear here, even before earning points.</p></div>}
       {query.data && query.data.total > 20 && <div className="pagination"><button className="button" disabled={offset === 0} onClick={() => setOffset(offset - 20)}>Previous</button><span>{offset + 1}–{Math.min(offset + 20, query.data.total)} of {query.data.total}</span><button className="button" disabled={offset + 20 >= query.data.total || offset >= 10000} onClick={() => setOffset(offset + 20)}>Next</button></div>}
-    </section><aside><section className="panel ranking-season"><h2><ChartNoAxesColumnIncreasing size={27} /> Your season.</h2><div className="profile-totals"><div><b>{own.data?.points ?? '—'}</b><span>points</span></div><div><b>{own.data?.streak.current ?? '—'}</b><span>day streak</span></div><div><b>{own.data ? own.data.capture_photos + own.data.capture_videos + own.data.gallery_photos + own.data.gallery_videos : '—'}</b><span>uploads</span></div></div><div className="grace-note"><ShieldCheck size={27} /><div><h3>{own.data ? own.data.streak.grace_used_this_week ? 'Grace used this week' : 'Grace available' : 'Grace syncing'}</h3><p>One missed day can preserve a live streak. Grace adds no points or active day.</p></div></div>{own.isError && <ErrorBox error={own.error} retry={() => void own.refetch()} />}</section><section className="panel score-explainer"><span className="eyebrow">HOW IT ADDS UP</span><h2>Every moment counts.</h2><div className="rules-row"><ImageIcon size={20} />Camera photo <b>+1</b></div><div className="rules-row"><Film size={20} />Camera video <b>+3</b></div><div className="rules-row"><ImageIcon size={20} />Gallery sharing <b>0</b></div><p className="fine-print">No daily scoring cap. Equal scores share a rank. Only accepted captures count toward streaks.</p></section><Countdowns /></aside></div></>
+    </section><aside><section className="panel ranking-season"><h2><ChartNoAxesColumnIncreasing size={27} /> Your season.</h2><div className="profile-totals"><div><b>{own.data?.points ?? '—'}</b><span>points</span></div><div><b>{own.data?.streak.current ?? '—'}</b><span>day streak</span></div><div><b>{own.data ? own.data.capture_photos + own.data.capture_videos + own.data.gallery_photos + own.data.gallery_videos : '—'}</b><span>uploads</span></div></div><div className="grace-note"><ShieldCheck size={27} /><div><h3>{own.data ? own.data.streak.grace_used_this_week ? 'Grace used this week' : 'Grace available' : 'Grace syncing'}</h3><p>One missed day can preserve a live streak. Grace adds no points or active day.</p></div></div>{own.isError && <ErrorBox error={own.error} retry={() => void own.refetch()} />}</section><details className="panel score-explainer"><summary>How it works</summary><span className="eyebrow">HOW IT ADDS UP</span><h2>Every moment counts.</h2><div className="rules-row"><ImageIcon size={20} />Camera photo <b>+1</b></div><div className="rules-row"><Film size={20} />Camera video <b>+3</b></div><div className="rules-row"><ImageIcon size={20} />Gallery sharing <b>0</b></div><p className="fine-print">No daily scoring cap. Equal scores share a rank. Only accepted captures count toward streaks.</p></details><Countdowns /></aside></div></>
 }
 
 export function ProfilePage({ group, session, rank, rankError }: { group: Group; session: Session; rank?: Rank; rankError: unknown }) {
@@ -89,7 +90,7 @@ export function ProfilePage({ group, session, rank, rankError }: { group: Group;
   const link = invite ? `${window.location.origin}/?invite=${encodeURIComponent(invite.token)}` : ''
   async function copy() { try { await navigator.clipboard.writeText(link); setCopied(true); setCopyError(false) } catch { setCopied(false); setCopyError(true) } }
   function edit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); rename.mutate(String(new FormData(event.currentTarget).get('name')).trim()) }
-  return <><div className="page-heading"><div><span className="eyebrow">YOUR LITTLE PIECE OF THE YEAR</span><h1>Your <em>season.</em></h1><p>Thanks for showing up, {session.user.display_name}.</p></div><Avatar name={session.user.display_name} /></div>
+  return <><div className="page-heading"><div><h1>Profile</h1><p>{session.user.display_name}</p><button className="text-button" onClick={() => window.dispatchEvent(new Event("mustard:replay-tour"))}>Replay tour</button></div><Avatar name={session.user.display_name} /></div>
     <div className="profile-layout"><div><section className="panel"><Stats rank={rank} />{rankError != null && <ErrorBox error={rankError} retry={() => void qc.invalidateQueries({ queryKey: ['own'] })} />}
       <div className="grace-note"><ShieldCheck size={30} /><div><h3>{rank ? rank.streak.grace_used_this_week ? 'This week’s grace is used.' : 'One grace day, on us.' : 'Checking your grace…'}</h3><p>A grace day preserves a live streak. It adds no active day or points, and cannot start a new streak.</p></div></div>
       <div className="profile-totals"><div><b>{rank?.streak.longest ?? '—'}</b><span>longest streak</span></div><div><b>{rank ? rank.capture_photos + rank.capture_videos : '—'}</b><span>scoring captures</span></div><div><b>{rank ? rank.gallery_photos + rank.gallery_videos : '—'}</b><span>gallery shares</span></div></div>

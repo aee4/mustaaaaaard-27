@@ -1,0 +1,83 @@
+import { test, expect } from '@playwright/test'
+
+test('account tour, optimistic likes, comment retry and responsive sheet with a real backend', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('Development ID').fill('social-' + crypto.randomUUID())
+  await page.getByLabel('Display name', { exact: true }).fill('Synthetic social check')
+  await page.getByRole('button', { name: 'Enter the season' }).click()
+  await page.getByRole('button', { name: 'Create group', exact: true }).click()
+  await page.getByLabel('Group name').fill('Social verification ' + crypto.randomUUID())
+  await page.getByRole('button', { name: 'Create and open feed' }).click()
+  const tour = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Your everyday moments' }) })
+  await expect(tour).toBeVisible()
+  await expect(page.locator('.tour-highlight')).toBeVisible()
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('camera video 3')
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page).toHaveURL('http://localhost:3000/')
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect.poll(async () => { const r = await page.locator('.tour-tooltip').boundingBox(); return !!r && r.x >= 0 && r.x + r.width <= width }).toBe(true)
+  }
+  for (let index = 0; index < 3; index++) await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(page.getByRole('dialog')).not.toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Replay tour' })).toBeVisible()
+  await page.getByRole('button', { name: 'Replay tour' }).click()
+  await page.getByRole('button', { name: 'Skip', exact: true }).click()
+  const session = await (await page.request.get('/api/auth/session')).json()
+  const headers = { Origin: 'http://localhost:3000', 'X-CSRF-Token': session.csrf_token }
+  const group = await page.getByLabel('Your group').inputValue()
+  const bytes = await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = 400; canvas.height = 300; const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#edba34'; ctx.fillRect(0, 0, 400, 300); ctx.fillStyle = '#25251f'; ctx.fillText(crypto.randomUUID(), 20, 40); return canvas.toDataURL().split(',')[1] })
+  const created = await page.request.post(`/api/groups/${group}/gallery?kind=photo`, { headers: { ...headers, 'Idempotency-Key': crypto.randomUUID() }, multipart: { file: { name: 'synthetic.png', mimeType: 'image/png', buffer: Buffer.from(bytes, 'base64') }, caption: 'A synthetic memory' } })
+  expect(created.ok()).toBe(true)
+  const post = await created.json()
+  try {
+    await page.goto('/')
+    let likeRequests = 0
+    await page.route('**/api/groups/*/posts/*/like', async route => {
+      likeRequests++
+      if (likeRequests === 1) await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'test_unavailable', message: 'Synthetic temporary failure' } }) })
+      else await route.continue()
+    })
+    await page.getByRole('button', { name: 'Like post', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('Synthetic temporary failure')
+    await expect(page.locator('.like-count')).toHaveText('0 likes')
+    await page.getByRole('button', { name: 'Like post', exact: true }).evaluate((button: HTMLButtonElement) => { for (let tap = 0; tap < 5; tap++) button.click() })
+    await expect(page.getByRole('button', { name: 'Unlike post', exact: true })).toBeEnabled()
+    await expect(page.locator('.like-count')).toHaveText('1 like')
+    expect(likeRequests).toBe(2)
+    await page.reload()
+    await expect(page.getByRole('button', { name: 'Unlike post', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Unlike post', exact: true }).click()
+    await expect(page.locator('.like-count')).toHaveText('0 likes')
+    await page.getByRole('button', { name: 'Open comments' }).click()
+    await page.getByLabel('Add a comment').fill('<b>Plain text</b> 💛')
+    let dropped = false
+    await page.route('**/api/groups/*/posts/*/comments', async route => {
+      if (route.request().method() === 'POST' && !dropped) { dropped = true; await route.fetch(); await route.abort('failed') } else await route.continue()
+    })
+    await page.getByRole('button', { name: 'Send', exact: true }).click()
+    await page.getByRole('button', { name: 'Retry comment', exact: true }).click()
+    await expect(page.locator('.comment')).toHaveCount(1)
+    await expect(page.locator('.comment p')).toHaveText('<b>Plain text</b> 💛')
+    await expect(page.locator('.comment p b')).toHaveCount(0)
+    for (const width of [320, 390, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      const rect = await page.locator('.comments-dialog').boundingBox()
+      expect(rect!.x).toBeGreaterThanOrEqual(0)
+      expect(rect!.x + rect!.width).toBeLessThanOrEqual(width)
+      await page.screenshot({ path: `test-results/social-${width}.png`, fullPage: true })
+    }
+    page.once('dialog', dialog => dialog.accept())
+    await page.getByRole('button', { name: 'Delete comment' }).click()
+    await expect(page.locator('.comment')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Close comments' }).click()
+    await expect(page.getByRole('button', { name: 'Open comments' })).toBeFocused()
+    const ranks = await (await page.request.get(`/api/groups/${group}/leaderboard`)).json()
+    expect(ranks.items[0].points).toBe(0)
+    expect(ranks.items[0].streak.current).toBe(0)
+  } finally { await page.request.delete(`/api/groups/${group}/posts/${post.id}`, { headers }) }
+})

@@ -3,6 +3,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -113,7 +114,11 @@ class Post(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_id)
     upload_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("uploads.id"), unique=True)
     group_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("groups.id"))
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("posts.id"), index=True)
+    title: Mapped[str | None] = mapped_column(String(100))
+    seed_key: Mapped[str | None] = mapped_column(String(80))
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     capture_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("captures.id"), unique=True)
     fingerprint: Mapped[str] = mapped_column(String(64))
     caption: Mapped[str | None] = mapped_column(String(280))
@@ -125,9 +130,10 @@ class Post(Base):
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
         UniqueConstraint("group_id", "fingerprint", name="uq_group_fingerprint"),
+        UniqueConstraint("group_id", "seed_key", name="uq_group_seed"),
         CheckConstraint("kind IN ('photo','video')", name="post_kind"),
         CheckConstraint(
-            "(source = 'capture' AND capture_id IS NOT NULL) OR (source = 'gallery' AND capture_id IS NULL)",
+            "(source = 'capture' AND capture_id IS NOT NULL AND user_id IS NOT NULL) OR (source = 'gallery' AND capture_id IS NULL AND user_id IS NOT NULL) OR (source = 'system' AND capture_id IS NULL AND user_id IS NULL)",
             name="post_source",
         ),
         Index("ix_posts_feed", "group_id", "accepted_at", "id"),
@@ -158,3 +164,33 @@ class RateBucket(Base):
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     window: Mapped[int] = mapped_column(Integer, primary_key=True)
     hits: Mapped[int] = mapped_column(Integer)
+
+
+class PostLike(Base):
+    __tablename__ = "post_likes"
+    post_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("posts.id"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_id)
+    post_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("posts.id"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    idempotency_key: Mapped[str] = mapped_column(String(128))
+    text: Mapped[str | None] = mapped_column(String(500))
+    text_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint("post_id", "user_id", "idempotency_key", name="uq_comment_retry"),
+        Index("ix_comments_page", "post_id", "created_at", "id"),
+    )
+
+
+class TourProgress(Base):
+    __tablename__ = "tour_progress"
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

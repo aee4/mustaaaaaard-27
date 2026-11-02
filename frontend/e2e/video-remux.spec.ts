@@ -6,6 +6,8 @@ test('real signed remuxed MP4 and WebM play in Chrome; unsigned storage stays pr
   await page.getByLabel('Development ID').fill('remux-' + Date.now())
   await page.getByLabel('Display name', { exact: true }).fill('Synthetic video check')
   await page.getByRole('button', { name: 'Enter the season' }).click()
+  await expect(page.getByLabel('Your group')).toBeVisible()
+  { const session = await (await page.request.get('/api/auth/session')).json(); await page.request.put('/api/me/tour/1', { headers: { Origin: 'http://localhost:3000', 'X-CSRF-Token': session.csrf_token } }); await page.reload() }
   await expect(page.getByRole('button', { name: 'Create group', exact: true })).toBeVisible()
   const session = await (await page.request.get('/api/auth/session')).json()
   const headers = { Origin: 'http://localhost:3000', 'X-CSRF-Token': session.csrf_token }

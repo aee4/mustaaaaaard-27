@@ -36,6 +36,8 @@ def representation(post: Post) -> PostOut:
         accepted_at=post.accepted_at,
         removed=post.removed_at is not None,
         caption=post.caption if post.removed_at is None else None,
+        title=post.title,
+        pinned=post.pinned,
     )
 
 

@@ -135,6 +135,33 @@ current 1, no grace until Wednesday. Deleting Monday when Tuesday had grace does
 not allow that grace to start a streak; Wednesday begins a new streak.
 
 ## Feed, ranks and removals acceptance
+Private social release: one shared operator-seeded system welcome post per initial
+group, title “The Final Season 💛”, caption “Our people. Our everyday moments.”
+Its cover and ordered welcome album use the existing private, sanitized media
+pipeline and storage quotas. System posts have no member author, points or streak
+credit. Album children never appear as separate feed posts. Admins may unpin or
+remove the welcome; seeding is resumable/idempotent and never repins or resurrects
+removed content. No automatic seeding into new/unrelated groups.
+
+Feed returns `pinned` separately from paginated `items`, with author display name,
+like/comment counts, current viewer's liked state and private album post IDs.
+PUT/DELETE post `/like` set/unset membership-scoped likes; composite primary key
+enforces one per account. Like mutations serialize on the live post and do not
+affect scores. Comments are trimmed, newline-normalized plain text, 1–500 Unicode
+code points, newest-first signed keyset pagination scoped to group/post. Creation
+requires Idempotency-Key (1–128), unique per post/account; changed normalized text
+under the same key conflicts. Removed retry results retain a digest, never text.
+Authors delete their own comments; admins moderate their group. Removed posts,
+album children and revoked memberships cannot be accessed through social routes.
+Deletion clears comment text, retaining tombstones/retry protection. CSRF/Origin
+apply to every mutation; PostgreSQL fixed-window rates are 120 likes/minute and
+30 comment mutations/minute per user. No comment likes/replies/notifications.
+
+Tour completion/skip is stored by authenticated account and tour version through
+GET/PUT `/me/tour/{version}`. Feed → Capture → Leaderboard → Profile, with Back,
+Next, Skip/Done and Profile replay. The tour pauses during dirty capture/uploads;
+keyboard-modal focus, reduced motion and missing targets are handled gracefully.
+
 Feed descending (accepted_at,id) keyset cursor, default 20/max100, cursor scoped
 to group. Leaderboards include all active members, zero scores included, weekly
 or all time; rank=1,1,3, tie order display_name then UUID. Counts distinguish scoring

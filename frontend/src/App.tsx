@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { Camera, House, ChartNoAxesColumnIncreasing, UserRound, ArrowUpRight, LogOut, ChevronDown, Sparkles, ShieldCheck } from 'lucide-react'
+import { Camera, House, ChartNoAxesColumnIncreasing, UserRound, ArrowUpRight, LogOut, ChevronDown, Flame, ShieldCheck } from 'lucide-react'
 import { api, setCsrf, type Group, type Session } from './api/client'
 import { ownRank } from './api/queries'
 import { Avatar, Countdowns, ErrorBox, Loading, Stats } from './components/Common'
 import { FeedPage, LeaderboardPage, ProfilePage } from './pages/Season'
+import { Tour } from './components/Tour'
 import { CapturePage } from './pages/Capture'
 
 export function Brand() {
@@ -22,10 +23,10 @@ function Login({ onLogin }: { onLogin: (session: Session) => void }) {
     catch (e) { setError(e) } finally { setPending(false) }
   }
   return <div className="login-layout"><div className="login-story"><Brand /><div className="chapter">ONE LAST YEAR. ALL OUR LITTLE MOMENTS.</div>
-    <h1>Same people.<br />One final<br /><em>season.</em></h1><p>For the in-between days we’ll wish we could do again.</p>
+    <h1>The Final Season 💛</h1><p>Our people. Our everyday moments.</p>
     <div className="season-stamp" aria-hidden="true"><span>MAKE IT COUNT</span><b>’27</b><small>MEMORIES IN THE MAKING</small></div>
     <footer>PRIVATE GROUP · EVERYDAY MOMENTS · OUR FINAL YEAR</footer></div>
-    <main className="login-form"><span className="eyebrow">WELCOME BACK, FRIEND</span><h2>Your people.<br />Your last chapter.</h2>
+    <main className="login-form"><span className="eyebrow">WELCOME BACK, FRIEND</span><h2>Welcome to Mustaaaaaard ’27</h2>
       <p>Capture a little of today. Keep a little of this year.</p>
       <a className="button dark w-full" href="/auth/google">Continue with Google <ArrowUpRight size={18} /></a>
       {import.meta.env.DEV && import.meta.env.VITE_DEV_LOGIN === 'true' && <form onSubmit={submit} className="dev-login">
@@ -123,16 +124,14 @@ export default function App() {
   if (session.isPending) return <div className="welcome-loading"><Brand /><Loading text="Finding your people…" /></div>
   if (session.isError) return <div className="welcome-loading"><Brand /><ErrorBox error={session.error} retry={() => void session.refetch()} /></div>
   if (!session.data) return <Login onLogin={value => { qc.setQueryData(['session'], value); navigate('/') }} />
-  return <div className="app-layout"><aside className="sidebar"><Brand /><span className="eyebrow">THE GOOD OLD DAYS ARE NOW.</span>
-    <Nav /><div className="sidebar-note"><Sparkles size={22} /><h2>Don’t let today<br />be a blur.</h2><p>One small moment.<br />One very big year.</p><span className="scribble">Make it count.</span></div>
-    <span className="sidebar-footer">EST. IN FRIENDSHIP<br />FINISHING TOGETHER · ’27</span></aside>
+  return <div className="app-layout"><aside className="sidebar"><Brand /><Nav /></aside>
     <div className="app-content"><header className={`topbar ${location.pathname === '/' ? 'feed-topbar' : 'inner-topbar'}`}><div className="mobile-brand"><Brand /></div><div className="group-picker">
       <label className="sr-only" htmlFor="group">Your group</label><select id="group" value={group?.id || ''} onChange={e => {
         if (dirty && !window.confirm('Discard your capture and change groups? A sent upload may still be accepted.')) return
         setSelected(e.target.value)
         if (!dirty) navigate('/')
       }}><option value="" disabled>Select group</option>{groups.data?.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select><ChevronDown size={14} /></div>
-      <div className="account"><button className="text-button join-link" aria-label="Manage groups" disabled={dirty} title={dirty ? 'Finish or cancel this capture before managing groups' : 'Create or join a group'} onClick={() => setJoining(!joining)}>Groups</button><Avatar name={session.data.user.display_name} /><button aria-label="Log out" className="icon-button" onClick={() => void logout()}><LogOut size={18} /></button></div>
+      <span className="streak-badge"><Flame size={19} />{own.data?.streak.current ?? "—"} day streak</span><div className="account"><button className="text-button join-link" aria-label="Manage groups" disabled={dirty} title={dirty ? 'Finish or cancel this capture before managing groups' : 'Create or join a group'} onClick={() => setJoining(!joining)}>Groups</button><Avatar name={session.data.user.display_name} /><button aria-label="Log out" className="icon-button" onClick={() => void logout()}><LogOut size={18} /></button></div>
     </header>
     <main className="main" id="main"><a className="skip-link" href="#page-content">Skip to content</a>
       {logoutError != null && <ErrorBox error={logoutError} />}
@@ -147,7 +146,7 @@ export default function App() {
         <Route path="*" element={<section className="empty"><h1>A little off course.</h1><NavLink to="/">Back to the feed</NavLink></section>} />
       </Routes></div>}
     </main><footer className="page-footer">Our everyday. Our people. Our final season.<span>Mustaaaaaard ’27</span></footer></div>
-    <div className="mobile-nav"><Nav /></div>
+    <div className="mobile-nav"><Nav /></div>{group && <Tour key={session.data.user.id} user={session.data.user.id} dirty={dirty} />}
   </div>
 }
 
@@ -155,7 +154,7 @@ function Nav() {
   return <nav aria-label="Main navigation">{[
     { to: '/', label: 'Feed', Icon: House }, { to: '/capture', label: 'Capture', Icon: Camera },
     { to: '/leaderboard', label: 'Leaderboard', Icon: ChartNoAxesColumnIncreasing }, { to: '/profile', label: 'Profile', Icon: UserRound },
-  ].map(({ to, label, Icon }) => <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''} ${label === 'Capture' ? 'capture-nav' : ''}`}><span><Icon size={23} /></span>{label}</NavLink>)}</nav>
+  ].map(({ to, label, Icon }) => <NavLink data-tour={label} key={to} to={to} end={to === '/'} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''} ${label === 'Capture' ? 'capture-nav' : ''}`}><span><Icon size={23} /></span>{label}</NavLink>)}</nav>
 }
 
 export function SeasonSummary({ rank }: { rank: Parameters<typeof Stats>[0]['rank'] }) {

@@ -7,15 +7,30 @@ from fastapi import APIRouter, Depends, Form, Header, Query, Request, Response, 
 from fastapi.responses import RedirectResponse
 from pydantic import BeforeValidator
 from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import insert
 from starlette.concurrency import run_in_threadpool
 
 from app.api.dependencies import Identity, check_origin, identity
 from app.core.errors import Problem, require
-from app.models.entities import Capture, Group, Invite, LoginSession, Membership, Post, Upload, User
+from app.models.entities import (
+    Capture,
+    Group,
+    Invite,
+    LoginSession,
+    Membership,
+    Post,
+    TourProgress,
+    Upload,
+    User,
+)
 from app.schemas.api import (
     CaptureIn,
     CaptureOut,
+    CommentIn,
+    CommentOut,
+    CommentsOut,
     DevLogin,
+    EngagementOut,
     FeedOut,
     GroupCreate,
     GroupOut,
@@ -26,12 +41,15 @@ from app.schemas.api import (
     LeaderboardOut,
     MediaOut,
     Ok,
+    PinIn,
     PostOut,
     ProfileEdit,
     ProfileOut,
     SessionOut,
+    TourOut,
     UserOut,
 )
+from app.services import engagement
 from app.services import identity as accounts
 from app.services.social import feed, leaderboard, remove_post
 from app.services.streaks import calculate
@@ -89,7 +107,7 @@ def ready(request: Request) -> Ok:
     try:
         with request.app.state.factory.begin() as db:
             revision = db.scalar(text("SELECT version_num FROM alembic_version"))
-            require(revision == "0003", 503, "not_ready", "Schema migration required")
+            require(revision == "0004", 503, "not_ready", "Schema migration required")
         request.app.state.storage.ready()
     except Exception as exc:
         raise Problem(503, "not_ready", "Database/schema/storage unavailable") from exc
@@ -373,6 +391,14 @@ def media(
             "Post not found",
         )
         assert post is not None
+        if post.parent_id:
+            parent = db.get(Post, post.parent_id)
+            require(
+                parent is not None and parent.group_id == group_id and parent.removed_at is None,
+                404,
+                "post_not_found",
+                "Post not found",
+            )
         row = db.get(Upload, post.upload_id)
         require(
             row is not None and row.object_key is not None,
@@ -395,3 +421,127 @@ def delete_post(group_id: uuid.UUID, post_id: uuid.UUID, request: Request, auth:
     with request.app.state.factory.begin() as db:
         remove_post(db, group_id, auth.user.id, post_id, request.app.state.clock.now())
     return Ok()
+
+
+@router.put("/groups/{group_id}/posts/{post_id}/like", response_model=EngagementOut)
+def like_post(
+    group_id: uuid.UUID, post_id: uuid.UUID, request: Request, auth: Auth
+) -> EngagementOut:
+    limit(request, f"social:{auth.user.id}", 120)
+    with request.app.state.factory.begin() as db:
+        return engagement.set_like(
+            db, group_id, auth.user.id, post_id, request.app.state.clock.now(), True
+        )
+
+
+@router.delete("/groups/{group_id}/posts/{post_id}/like", response_model=EngagementOut)
+def unlike_post(
+    group_id: uuid.UUID, post_id: uuid.UUID, request: Request, auth: Auth
+) -> EngagementOut:
+    limit(request, f"social:{auth.user.id}", 120)
+    with request.app.state.factory.begin() as db:
+        return engagement.set_like(
+            db, group_id, auth.user.id, post_id, request.app.state.clock.now(), False
+        )
+
+
+@router.get("/groups/{group_id}/posts/{post_id}/comments", response_model=CommentsOut)
+def list_comments(
+    group_id: uuid.UUID,
+    post_id: uuid.UUID,
+    request: Request,
+    auth: Auth,
+    limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None, max_length=1000),
+) -> CommentsOut:
+    with request.app.state.factory.begin() as db:
+        return engagement.comments(
+            db,
+            group_id,
+            auth.user.id,
+            post_id,
+            limit,
+            cursor,
+            request.app.state.settings.secret_key,
+        )
+
+
+@router.post(
+    "/groups/{group_id}/posts/{post_id}/comments", response_model=CommentOut, status_code=201
+)
+def create_comment(
+    group_id: uuid.UUID,
+    post_id: uuid.UUID,
+    body: CommentIn,
+    request: Request,
+    auth: Auth,
+    idempotency_key: Idempotency,
+) -> CommentOut:
+    limit(request, f"comments:{auth.user.id}", 30)
+    with request.app.state.factory.begin() as db:
+        return engagement.add_comment(
+            db,
+            group_id,
+            auth.user.id,
+            post_id,
+            body.text,
+            idempotency_key,
+            request.app.state.clock.now(),
+        )
+
+
+@router.delete("/groups/{group_id}/posts/{post_id}/comments/{comment_id}", response_model=Ok)
+def delete_comment(
+    group_id: uuid.UUID, post_id: uuid.UUID, comment_id: uuid.UUID, request: Request, auth: Auth
+) -> Ok:
+    limit(request, f"comments:{auth.user.id}", 30)
+    with request.app.state.factory.begin() as db:
+        engagement.remove_comment(
+            db, group_id, auth.user.id, post_id, comment_id, request.app.state.clock.now()
+        )
+    return Ok()
+
+
+@router.patch("/groups/{group_id}/posts/{post_id}/pin", response_model=Ok)
+def pin_post(
+    group_id: uuid.UUID, post_id: uuid.UUID, body: PinIn, request: Request, auth: Auth
+) -> Ok:
+    with request.app.state.factory.begin() as db:
+        accounts.member(db, group_id, auth.user.id, admin=True, lock=True)
+        post = engagement.accessible(db, group_id, auth.user.id, post_id, lock=True)
+        require(
+            post.source == "system", 422, "not_welcome", "Only group welcome content can be pinned"
+        )
+        post.pinned = body.pinned
+        accounts.audit(
+            db,
+            group_id,
+            auth.user.id,
+            "welcome.pinned" if body.pinned else "welcome.unpinned",
+            str(post_id),
+            request.app.state.clock.now(),
+        )
+    return Ok()
+
+
+@router.get("/me/tour/{version}", response_model=TourOut)
+def tour_status(version: int, request: Request, auth: Auth) -> TourOut:
+    require(1 <= version <= 1000, 422, "invalid_version", "Invalid tour version")
+    with request.app.state.factory.begin() as db:
+        return TourOut(
+            version=version, completed=db.get(TourProgress, (auth.user.id, version)) is not None
+        )
+
+
+@router.put("/me/tour/{version}", response_model=TourOut)
+def complete_tour(version: int, request: Request, auth: Auth) -> TourOut:
+    require(1 <= version <= 1000, 422, "invalid_version", "Invalid tour version")
+    with request.app.state.factory.begin() as db:
+        db.execute(
+            insert(TourProgress)
+            .values(
+                user_id=auth.user.id, version=version, completed_at=request.app.state.clock.now()
+            )
+            .on_conflict_do_nothing()
+        )
+    return TourOut(version=version, completed=True)
