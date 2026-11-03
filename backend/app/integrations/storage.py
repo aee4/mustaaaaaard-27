@@ -54,7 +54,7 @@ class S3Storage:
                 Key=key,
                 Body=body,
                 ContentType=content_type,
-                CacheControl="private, max-age=0",
+                CacheControl="private, no-store",
             )
 
     def delete(self, key: str) -> None:
@@ -62,7 +62,13 @@ class S3Storage:
 
     def sign(self, key: str, seconds: int) -> str:
         return self.signer.generate_presigned_url(
-            "get_object", Params={"Bucket": self.bucket, "Key": key}, ExpiresIn=seconds
+            "get_object",
+            Params={
+                "Bucket": self.bucket,
+                "Key": key,
+                "ResponseCacheControl": "private, no-store",
+            },
+            ExpiresIn=seconds,
         )
 
     def ready(self) -> None:

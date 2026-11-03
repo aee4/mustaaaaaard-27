@@ -1,5 +1,10 @@
 import type { components } from './generated'
 import { syncTime } from '../lib/time'
+import { readiness } from '../lib/readiness'
+
+function requireReady() {
+  if (['connecting', 'timeout'].includes(readiness.getSnapshot())) throw new ApiError(0, 'backend_waking', 'Connecting to the backend. Please retry when connected; your changes have not been sent.')
+}
 
 export type Session = components['schemas']['SessionOut']
 export type Group = components['schemas']['GroupOut']
@@ -46,16 +51,19 @@ function authFailure(error: ApiError) {
 }
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  requireReady()
   const headers = new Headers(options.headers)
   const mutation = !['GET', 'HEAD'].includes(options.method || 'GET')
   if (options.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json')
   if (mutation && csrf) headers.set('X-CSRF-Token', csrf)
   let response: Response
   try { response = await fetch('/api' + path, { ...options, headers, credentials: 'include' }) }
-  catch { throw new ApiError(0, 'network_unavailable', 'Cannot reach the backend. Check your connection and that the API is running.') }
+  catch { readiness.unavailable(); throw new ApiError(0, 'network_unavailable', 'Cannot reach the backend. Check your connection and retry when connected.') }
   let body: unknown
   try { body = await response.json() } catch { body = undefined }
+  if (response.status >= 500 || body === undefined) readiness.unavailable()
   if (!response.ok) throw authFailure(parseError(response.status, body))
+  if (body === undefined) throw new ApiError(503, 'backend_unavailable', 'The backend is reconnecting. Please retry when connected.')
   return body as T
 }
 
@@ -99,6 +107,7 @@ export const api = {
 export type UploadPlan = { group: string; kind: Kind; capture: Capture | null; file: Blob; key: string; caption?: string | null }
 export function upload(plan: UploadPlan, onProgress: (value: number) => void): Promise<Post> {
   return new Promise((resolve, reject) => {
+    requireReady()
     const xhr = new XMLHttpRequest()
     const path = plan.capture ? `/captures/${plan.capture.id}/upload` : '/gallery'
     xhr.open('POST', `/api/groups/${plan.group}${path}?kind=${plan.kind}`)
@@ -110,11 +119,13 @@ export function upload(plan: UploadPlan, onProgress: (value: number) => void): P
     xhr.onload = () => {
       let body: unknown
       try { body = JSON.parse(xhr.responseText) } catch { body = undefined }
-      if (xhr.status >= 200 && xhr.status < 300) { onProgress(100); resolve(body as Post) }
+      if (xhr.status >= 500 || body === undefined) readiness.unavailable()
+      if (xhr.status >= 200 && xhr.status < 300 && body !== undefined) { onProgress(100); resolve(body as Post) }
+      else if (body === undefined) reject(new ApiError(503, 'upload_unknown', 'The backend is reconnecting. Acceptance may have completed. Retry these same bytes with the same key when connected.'))
       else reject(authFailure(parseError(xhr.status, body)))
     }
-    xhr.onerror = xhr.ontimeout = () => reject(new ApiError(0, 'upload_unknown',
-      'Connection lost. Acceptance may have completed. Retry these same bytes with the same key to check.'))
+    xhr.onerror = xhr.ontimeout = () => { readiness.unavailable(); reject(new ApiError(0, 'upload_unknown',
+      'Connection lost. Acceptance may have completed. Retry these same bytes with the same key to check.')) }
     const form = new FormData()
     const extension = plan.file.type.startsWith('image/jpeg') ? 'jpg' : plan.file.type.startsWith('image/webp') ? 'webp' : plan.file.type.startsWith('video/mp4') ? 'mp4' : plan.kind === 'photo' ? 'png' : 'webm'
     form.append('file', plan.file, `${plan.kind}.${extension}`)

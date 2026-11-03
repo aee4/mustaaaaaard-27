@@ -60,7 +60,10 @@ def create_web_app(settings: Settings, directory: Path, api: FastAPI | None = No
         middleware=[
             Middleware(
                 TrustedHostMiddleware,
-                allowed_hosts=[urlsplit(settings.base_url).hostname or "invalid"]
+                allowed_hosts=[
+                    urlsplit(settings.base_url).hostname or "invalid",
+                    *settings.backend_hosts,
+                ]
                 if settings.environment == "production"
                 else ["*"],
             ),

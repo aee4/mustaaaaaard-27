@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     dev_auth: bool = False
     base_url: str = "http://localhost:8000"
     allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
+    backend_hosts: list[str] = []
     cookie_secure: bool = False
     session_seconds: int = 604800
     capture_seconds: int = 600
@@ -59,6 +60,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_security(self) -> "Settings":
+        if any(not host or any(c in host for c in "/:*@?#\\") for host in self.backend_hosts):
+            raise ValueError("Backend hosts must be exact hostnames without ports or wildcards")
         for value in (
             self.session_seconds,
             self.capture_seconds,

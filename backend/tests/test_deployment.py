@@ -43,6 +43,9 @@ def test_production_driver_and_origin_validation():
     for value in ["https://app.test/path", "https://user@app.test", "https://app.test?x=y"]:
         with pytest.raises(ValueError):
             Settings(**{**config.model_dump(), "base_url": value})
+    for host in ["*", "https://backend.test", "backend.test:443", "*.onrender.com"]:
+        with pytest.raises(ValueError):
+            Settings(**{**config.model_dump(), "backend_hosts": [host]})
 
 
 def test_production_r2_requires_explicit_acknowledgement_and_quotas():
@@ -67,6 +70,7 @@ def test_configuration_errors_hide_secret_values():
 @pytest.mark.integration
 def test_same_origin_artifact_routes_and_host_guard(web_files, factory, storage, clock):
     config = production_settings()
+    config.backend_hosts = ["fallback.onrender.com"]
     web = create_web_app(config, web_files, create_app(config, factory, storage, clock))
     with TestClient(web, base_url=config.base_url) as client:
         for path in ["/", "/capture", "/leaderboard", "/profile"]:
@@ -85,6 +89,7 @@ def test_same_origin_artifact_routes_and_host_guard(web_files, factory, storage,
             == 404
         )
         assert client.get("/", headers={"host": "evil.example"}).status_code == 400
+        assert client.get("/health", headers={"host": "fallback.onrender.com"}).status_code == 200
 
 
 @pytest.mark.integration

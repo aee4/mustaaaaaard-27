@@ -8,12 +8,15 @@ import { Avatar, Countdowns, ErrorBox, Loading, Stats } from './components/Commo
 import { FeedPage, LeaderboardPage, ProfilePage } from './pages/Season'
 import { Tour } from './components/Tour'
 import { CapturePage } from './pages/Capture'
+import { useReadiness } from './components/Connection'
 
 export function Brand() {
   return <div className="brand"><span>Mustaaaaaard <i>’27</i></span><small><svg viewBox="0 0 48 16" aria-hidden="true"><path d="M3 12Q19-4 24 7T45 5" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" /></svg>The Final Season.</small></div>
 }
 
-function Login({ onLogin }: { onLogin: (session: Session) => void }) {
+function Login({ onLogin, sessionPending = false }: { onLogin: (session: Session) => void; sessionPending?: boolean }) {
+  const connection = useReadiness()
+  const available = !sessionPending && (connection === 'ready' || connection === 'idle')
   const [error, setError] = useState<unknown>(null)
   const [pending, setPending] = useState(false)
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -28,13 +31,13 @@ function Login({ onLogin }: { onLogin: (session: Session) => void }) {
     <footer>PRIVATE GROUP · EVERYDAY MOMENTS · OUR FINAL YEAR</footer></div>
     <main className="login-form"><span className="eyebrow">WELCOME BACK, FRIEND</span><h2>Welcome to Mustaaaaaard ’27</h2>
       <p>Capture a little of today. Keep a little of this year.</p>
-      <a className="button dark w-full" href="/auth/google">Continue with Google <ArrowUpRight size={18} /></a>
+      <a role="link" className="button dark w-full" aria-disabled={!available} tabIndex={available ? 0 : -1} href={available ? `/auth/google?return_to=${encodeURIComponent(window.location.pathname + window.location.search)}` : undefined} onClick={e => { if (!available) e.preventDefault() }}>Continue with Google <ArrowUpRight size={18} /></a>
       {import.meta.env.DEV && import.meta.env.VITE_DEV_LOGIN === 'true' && <form onSubmit={submit} className="dev-login">
         <span className="eyebrow">LOCAL DEVELOPMENT LOGIN</span>
         <label>Development ID<input name="subject" required pattern="[a-zA-Z0-9_-]{1,80}" placeholder="alice" autoComplete="username" /></label>
         <small className="dev-id-hint">IDs are case-sensitive. The bootstrapped local admin ID is alice.</small>
         <label>Display name<input name="name" required maxLength={80} placeholder="Your name" autoComplete="nickname" /></label>
-        <button className="button yellow w-full" disabled={pending}>{pending ? 'Signing in…' : 'Enter the season'}<ArrowUpRight size={18} /></button>
+        <button className="button yellow w-full" disabled={pending || !available}>{pending ? 'Signing in…' : 'Enter the season'}<ArrowUpRight size={18} /></button>
         <small>Development only. Create your own group or join with an invite. The initial group uses explicit admin bootstrap.</small>
       </form>}
       {error != null && <ErrorBox error={error} />}<p className="privacy-note"><ShieldCheck size={18} /> Just your group. Never a public feed.</p>
@@ -89,6 +92,8 @@ function GroupOnboarding({ empty, initialToken, onComplete }: { empty: boolean; 
 }
 
 export default function App() {
+  const connection = useReadiness()
+  const available = connection === 'ready' || connection === 'idle'
   const qc = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
@@ -98,13 +103,12 @@ export default function App() {
   const [joining, setJoining] = useState(() => !!new URLSearchParams(window.location.search).get('invite'))
   const [initialInvite] = useState(() => new URLSearchParams(window.location.search).get('invite') || '')
   const [logoutError, setLogoutError] = useState<unknown>(null)
-  const session = useQuery({ queryKey: ['session'], queryFn: api.session, retry: false, staleTime: 60_000 })
+  const session = useQuery({ queryKey: ['session'], queryFn: api.session, enabled: available, retry: false, staleTime: 60_000 })
   const groups = useQuery({ queryKey: ['groups', session.data?.user.id], queryFn: api.groups, enabled: !!session.data })
   const group = groups.data?.find(g => g.id === selected) || groups.data?.find(g => g.name === 'Mustaaaaaard ’27') || groups.data?.[0]
   const own = useQuery({ queryKey: ['own', group?.id, session.data?.user.id],
     queryFn: () => ownRank(group!.id, session.data!.user.id), enabled: !!group && !!session.data })
   useEffect(() => {
-    if (initialInvite) window.history.replaceState(null, '', window.location.pathname)
     const expired = () => { qc.removeQueries({ predicate: q => q.queryKey[0] !== 'session' }); qc.setQueryData(['session'], null); setCsrf(null) }
     window.addEventListener('mustard:session-expired', expired)
     return () => window.removeEventListener('mustard:session-expired', expired)
@@ -121,9 +125,9 @@ export default function App() {
     try { await api.logout(); setCsrf(null); qc.clear(); qc.setQueryData(['session'], null); setSelected(''); navigate('/') }
     catch (e) { setLogoutError(e) }
   }
-  if (session.isPending) return <div className="welcome-loading"><Brand /><Loading text="Finding your people…" /></div>
-  if (session.isError) return <div className="welcome-loading"><Brand /><ErrorBox error={session.error} retry={() => void session.refetch()} /></div>
-  if (!session.data) return <Login onLogin={value => { qc.setQueryData(['session'], value); navigate('/') }} />
+  if (session.isPending) return <Login sessionPending onLogin={value => qc.setQueryData(['session'], value)} />
+  if (session.isError && !session.data) return <div className="welcome-loading"><Brand /><ErrorBox error={session.error} retry={() => void session.refetch()} /></div>
+  if (!session.data) return <Login sessionPending={session.isFetching} onLogin={value => { qc.setQueryData(['session'], value); navigate('/') }} />
   return <div className="app-layout"><aside className="sidebar"><Brand /><Nav /></aside>
     <div className="app-content"><header className={`topbar ${location.pathname === '/' ? 'feed-topbar' : 'inner-topbar'}`}><div className="mobile-brand"><Brand /></div><div className="group-picker">
       <label className="sr-only" htmlFor="group">Your group</label><select id="group" value={group?.id || ''} onChange={e => {

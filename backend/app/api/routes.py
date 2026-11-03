@@ -1,6 +1,7 @@
 import uuid
 from datetime import timedelta
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, Form, Header, Query, Request, Response, UploadFile
@@ -136,7 +137,23 @@ async def google_login(request: Request) -> Response:
         config.auth_rate,
     )
     oauth: OAuth = request.app.state.oauth
-    return await oauth.google.authorize_redirect(request, config.base_url + "/auth/google/callback")  # type: ignore[no-any-return]
+    origin = request.headers.get("x-mustard-origin", str(request.base_url).rstrip("/"))
+    if origin not in config.allowed_origins:
+        origin = config.base_url
+    destination = request.query_params.get("return_to", "/")
+    parsed = urlsplit(destination)
+    if (
+        not destination.startswith("/")
+        or destination.startswith("//")
+        or parsed.scheme
+        or parsed.netloc
+        or len(destination) > 2048
+        or any(ord(c) < 32 or c == "\\" for c in destination)
+    ):
+        destination = "/"
+    request.session["app_origin"] = origin
+    request.session["return_to"] = destination
+    return await oauth.google.authorize_redirect(request, origin + "/auth/google/callback")  # type: ignore[no-any-return]
 
 
 @router.get("/auth/google/callback")
@@ -148,7 +165,12 @@ async def google_callback(request: Request) -> Response:
         require(bool(subject), 401, "oauth_invalid", "Invalid Google identity")
     except Exception as exc:
         raise Problem(401, "oauth_invalid", "Google authentication failed") from exc
-    response = RedirectResponse(request.app.state.settings.base_url + "/", status_code=303)
+    config = request.app.state.settings
+    origin = request.session.pop("app_origin", config.base_url)
+    if origin not in config.allowed_origins:
+        origin = config.base_url
+    destination = request.session.pop("return_to", "/")
+    response = RedirectResponse(origin + destination, status_code=303)
     await run_in_threadpool(
         session_response, request, response, f"google:{subject}", str(info.get("name", "Friend"))
     )

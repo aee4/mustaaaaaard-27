@@ -73,7 +73,9 @@ def test_oidc_state_nonce_pkce_and_signed_identity(application, client, factory,
             "transport": httpx.MockTransport(provider),
         },
     )
-    start = client.get("/auth/google", follow_redirects=False)
+    start = client.get(
+        "/auth/google", params={"return_to": "/profile?invite=synthetic"}, follow_redirects=False
+    )
     assert start.status_code == 302
     query = parse_qs(urlsplit(start.headers["location"]).query)
     assert query["code_challenge_method"] == ["S256"]
@@ -89,6 +91,7 @@ def test_oidc_state_nonce_pkce_and_signed_identity(application, client, factory,
         assert client.get("/auth/session").status_code == 401
     else:
         assert callback.status_code == 303
+        assert callback.headers["location"].endswith("/profile?invite=synthetic")
         assert "HttpOnly" in callback.headers["set-cookie"]
         session = client.get("/auth/session").json()
         assert session["user"]["display_name"] == "Google Friend"
@@ -101,3 +104,20 @@ def test_oidc_state_nonce_pkce_and_signed_identity(application, client, factory,
             assert user.subject == "google:stable-subject"
         assert "provider-access-token" not in str(callback.headers)
     assert bool(exchanged) == (fault != "state")
+
+
+@pytest.mark.parametrize("destination", ["//evil.test", "https://evil.test", "/\\evil.test", "/\n"])
+def test_oauth_destination_cannot_escape_app(application, client, destination):
+    class Provider:
+        async def authorize_redirect(self, request, callback):
+            from starlette.responses import JSONResponse
+
+            return JSONResponse({"destination": request.session["return_to"], "callback": callback})
+
+    class Registry:
+        google = Provider()
+
+    application.state.settings.google_client_id = "test-client"
+    application.state.oauth = Registry()
+    result = client.get("/auth/google", params={"return_to": destination})
+    assert result.json()["destination"] == "/"

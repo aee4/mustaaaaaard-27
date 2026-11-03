@@ -173,6 +173,23 @@ fingerprint, timestamps and upload result; remove media through cleanup. Scores
 and streaks immediately exclude it. No public object URL in post representations.
 
 ## Operational acceptance
+React assets are hosted independently on Cloudflare. A fixed-upstream same-origin
+gateway forwards /api and Google /auth without caching, redirect following or body
+buffering. Preview origins cannot use production API/auth. Render retains its old
+frontend as a fallback; host-only cookies remain distinct between the two origins.
+Public invitations use configured BASE_URL. Existing sessions/data/media remain.
+
+On every document entry, before rendering, one shared readiness controller sends
+uncached /api/ready requests. Only successful JSON with ok=true is ready; HTML,
+invalid JSON and failures trigger bounded exponential backoff (1..8s), 12s request
+budget, 120s overall deadline and explicit Retry. The interface renders immediately;
+login waits for readiness and the initial session check. API actions are gated
+while reconnecting; navigation and local drafts remain available. Later network/
+5xx/non-JSON failures restart readiness; recovery refetches safe queries only.
+Mutation retries retain their original explicit idempotency semantics. No scheduled
+keep-alive. OAuth preserves a validated relative intended destination in the signed
+HttpOnly OAuth cookie, including invitation query strings; external redirects denied.
+
 Structured errors {error:{code,message,request_id}}, generated request IDs, no
 stack traces. Auth/invite/upload fixed-window PostgreSQL-backed limits; 30/30/60
 per minute defaults per IP/user. Reverse proxy must preserve client IP securely;

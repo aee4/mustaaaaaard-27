@@ -2,16 +2,15 @@
 
 **The Final Season.** Private final-year photo/video sharing. FastAPI/PostgreSQL/
 private S3 backend, with a mobile-first React/TypeScript frontend in `frontend/`.
-Nothing has been deployed.
+The existing production app is https://mustaaaaaard-27.onrender.com.
 
-The current deployment target is **Render Free (one React/FastAPI origin) + Neon
-Free + private R2 Standard**. Configuration is prepared in render.yaml and the root
-Dockerfile. The approved 720p remux path passed supporting Windows resource tests;
-deployment still awaits account setup. R2's
-free allowance is not a hard spending cap; activation needs explicit approval.
-See [the free-tier handoff](docs/free-tier-deployment.md) for actual stress results,
-account eligibility limits, exact secret/Google setup and Linux verification steps.
-No paid resources or production accounts have been configured.
+The Cloudflare frontend is https://mustaaaaaard-27.eeyramagbetor.workers.dev,
+with independent static assets and a same-origin API/auth gateway to the existing
+Render Free backend. Neon and private R2 are retained. The Render frontend remains
+available as a fallback. See [Cloudflare release and rollback](docs/cloudflare-frontend.md)
+and [PROGRESS.md](PROGRESS.md) for verification and outstanding release gates.
+Cloudflare serves the interface while Render wakes; Render Free cold starts remain.
+No hosting plan upgrade, paid service, custom domain or scheduled pinger is required.
 
 Linux verification can run on GitHub's standard Ubuntu runner without local Docker:
 see [the manual container workflow](docs/linux-container-verification.md) for free
@@ -23,7 +22,7 @@ physical-phone compatibility.
 
 Cloudflare hosting compatibility, current costs and provider-domain authentication
 tradeoffs are recorded in [docs/cloudflare-evaluation.md](docs/cloudflare-evaluation.md).
-This is an evaluation; no production resources or paid services are approved.
+That earlier evaluation is historical; the current frontend topology is documented above.
 
 ## Repository layout and command locations
 
