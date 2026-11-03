@@ -24,7 +24,15 @@ export default {
     // Pass the ReadableStream directly; never consume/clone/parse multipart bodies.
     const init = { method: request.method, headers, body: request.body, redirect: 'manual', cache: 'no-store', signal: request.signal, duplex: 'half' }
     let upstream
-    try { upstream = await fetch(target, init) } catch { return failure(503, 'Cannot connect. Please retry when the backend is ready.') }
+    try { upstream = await fetch(target, init) } catch {
+      if (auth) return new Response(null, { status: 303, headers: { Location: PUBLIC_ORIGIN + '/?connection_retry=1', 'Cache-Control': 'no-store' } })
+      return failure(503, 'Cannot connect. Please retry when the backend is ready.')
+    }
+    if (!(upstream.status >= 300 && upstream.status < 400) && !upstream.headers.get('Content-Type')?.includes('application/json')) {
+      await upstream.body?.cancel()
+      if (auth) return new Response(null, { status: 303, headers: { Location: PUBLIC_ORIGIN + '/?connection_retry=1', 'Cache-Control': 'no-store' } })
+      return failure(503, 'The backend is waking. Please retry when connected.')
+    }
     const response = new Response(upstream.body, upstream)
     response.headers.set('Cache-Control', 'no-store, private')
     response.headers.set('CDN-Cache-Control', 'no-store')

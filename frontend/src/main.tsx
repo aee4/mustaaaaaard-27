@@ -7,7 +7,9 @@ import { ApiError } from './api/client'
 import './styles.css'
 import { readiness } from './lib/readiness'
 import { Connection } from './components/Connection'
+import { restoreDestination } from './lib/destination'
 
+restoreDestination()
 readiness.start()
 window.addEventListener('pagehide', readiness.stop)
 window.addEventListener('pageshow', event => { if (event.persisted) readiness.retry() })

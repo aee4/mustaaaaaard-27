@@ -29,3 +29,10 @@ test('timeout offers Retry and recovery; no session request before readiness', a
   expect(sessions).toBe(1)
   expect(page.url()).toContain('/profile')
 })
+
+test('auth recovery restores the invite destination without storing session tokens', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('mustard:login-destination', '/profile?invite=synthetic'))
+  await page.goto('/?connection_retry=1')
+  await expect(page).toHaveURL(/\/profile\?invite=synthetic$/)
+  await expect(page.getByRole('link', { name: 'Continue with Google' })).toHaveAttribute('href', '/auth/google?return_to=%2Fprofile%3Finvite%3Dsynthetic')
+})

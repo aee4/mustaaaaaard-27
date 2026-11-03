@@ -87,7 +87,8 @@ R2 GET/HEAD/Range CORS permits exactly these two origins, without wildcards.
    manifest` emits public hashes. Its upload mode accepts the short-lived upload
    session JSON through hidden stdin and returns the completion JWT to the calling
    tool in memory; never log/save that output. `_headers` requires Wrangler's parser
-   when deploying via CLI; direct API deployments must supply parsed asset headers.
+   when deploying via CLI; direct API deployments supply its contents in
+   assets.config._headers (as this release does).
 3. Verify static deep links while API readiness fails, gateway no-store/session/
    CSRF, and preview rejection before updating backend public settings.
 4. Add Google entries above; deploy the tested backend commit with the settings

@@ -9,6 +9,7 @@ import { FeedPage, LeaderboardPage, ProfilePage } from './pages/Season'
 import { Tour } from './components/Tour'
 import { CapturePage } from './pages/Capture'
 import { useReadiness } from './components/Connection'
+import { rememberDestination } from './lib/destination'
 
 export function Brand() {
   return <div className="brand"><span>Mustaaaaaard <i>’27</i></span><small><svg viewBox="0 0 48 16" aria-hidden="true"><path d="M3 12Q19-4 24 7T45 5" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" /></svg>The Final Season.</small></div>
@@ -31,7 +32,7 @@ function Login({ onLogin, sessionPending = false }: { onLogin: (session: Session
     <footer>PRIVATE GROUP · EVERYDAY MOMENTS · OUR FINAL YEAR</footer></div>
     <main className="login-form"><span className="eyebrow">WELCOME BACK, FRIEND</span><h2>Welcome to Mustaaaaaard ’27</h2>
       <p>Capture a little of today. Keep a little of this year.</p>
-      <a role="link" className="button dark w-full" aria-disabled={!available} tabIndex={available ? 0 : -1} href={available ? `/auth/google?return_to=${encodeURIComponent(window.location.pathname + window.location.search)}` : undefined} onClick={e => { if (!available) e.preventDefault() }}>Continue with Google <ArrowUpRight size={18} /></a>
+      <a role="link" className="button dark w-full" aria-disabled={!available} tabIndex={available ? 0 : -1} href={available ? `/auth/google?return_to=${encodeURIComponent(window.location.pathname + window.location.search)}` : undefined} onClick={e => { if (!available) e.preventDefault(); else rememberDestination() }}>Continue with Google <ArrowUpRight size={18} /></a>
       {import.meta.env.DEV && import.meta.env.VITE_DEV_LOGIN === 'true' && <form onSubmit={submit} className="dev-login">
         <span className="eyebrow">LOCAL DEVELOPMENT LOGIN</span>
         <label>Development ID<input name="subject" required pattern="[a-zA-Z0-9_-]{1,80}" placeholder="alice" autoComplete="username" /></label>
