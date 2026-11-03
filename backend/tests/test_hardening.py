@@ -47,7 +47,7 @@ def test_group_duplicate_constraint_between_different_users(
         assert sorted(pool.map(attempt, [admin_id, other.id])) == ["accepted", "duplicate_media"]
     with factory.begin() as db:
         assert db.scalar(select(func.count()).select_from(Post)) == 1
-    assert len(storage.objects) == 1
+    assert len(storage.objects) == 2
 
 
 @pytest.mark.integration

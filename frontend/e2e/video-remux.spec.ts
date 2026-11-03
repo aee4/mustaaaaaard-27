@@ -33,6 +33,11 @@ test('real signed remuxed MP4 and WebM play in Chrome; unsigned storage stays pr
       expect((await page.request.get(unsigned.href)).status()).toBe(403)
     }
     await page.reload()
+    // Below-fold media is mounted only as it approaches the viewport.
+    for (const article of await page.locator('article').all()) {
+      await article.scrollIntoViewIfNeeded()
+      await page.waitForTimeout(100)
+    }
     await expect(page.locator('article video')).toHaveCount(3)
     for (const video of await page.locator('article video').all()) {
       await video.evaluate(async (element: HTMLVideoElement) => { element.muted = true; await element.play() })

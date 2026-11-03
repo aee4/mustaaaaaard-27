@@ -305,16 +305,22 @@ def run() -> None:
                 post = db.get(Post, uuid.UUID(identifier))
                 upload = db.get(Upload, post.upload_id)
                 key = upload.object_key
+                thumbnail_key = upload.thumbnail_key
                 upload_id = upload.id
                 assert post.removed_at and post.caption is None
             storage.delete_object(Bucket=bucket, Key=key)
+            if thumbnail_key:
+                storage.delete_object(Bucket=bucket, Key=thumbnail_key)
             try:
                 storage.head_object(Bucket=bucket, Key=key)
                 raise AssertionError("Synthetic object remained")
             except storage.exceptions.ClientError as exc:
                 assert exc.response["ResponseMetadata"]["HTTPStatusCode"] == 404
             with factory.begin() as db:
-                db.get(Upload, upload_id).storage_bytes = 0
+                row = db.get(Upload, upload_id)
+                row.storage_bytes = 0
+                row.object_key = row.thumbnail_key = None
+                row.thumbnail_ready = False
         if invite_id:
             request("DELETE", g + f"/invites/{invite_id}")
         if created:

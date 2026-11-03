@@ -1,5 +1,46 @@
 # Progress
 
+## Loading, performance and camera refinement — 2026-11-03
+
+Implemented additive migration `0005` for intrinsic media dimensions and private
+photo derivatives. New uploads preserve their sanitized original and create a
+960px-bounded WebP thumbnail in private storage. The derivative is counted against
+byte/object quota, protected by the existing active-membership/signed-URL path, and
+is deleted together with its original. A resumable `backfill-thumbnails` operator
+command supports existing live photos without rewriting originals, fingerprints,
+captions, posts, scores or grace history. Real MinIO verification covered quota
+rejection, lost storage response/resume, byte accounting, cleanup and preservation.
+
+The feed uses a reusable decode-aware `MediaImage`: intrinsic frames, neutral
+shimmer, short opacity reveal, cached-image fast path, reduced-motion support,
+bounded signed-URL renewal and explicit retry/offline state. Initial first-visible
+media is eager with only the LCP image prioritized; below-fold media is deferred.
+Private welcome/gallery originals are fetched only in the full-quality viewer.
+Synthetic before/after browser measurement using the previous release bundle showed
+initial media authorization calls reduced from **17 to 2**. Browser-rendered exact
+R2 byte totals were unavailable because signed R2 cross-origin responses omit
+`Content-Length`; the test records request reduction and derivative selection.
+
+Added matching feed/profile/leaderboard/comment skeletons, append skeletons,
+scroll restoration and media-query isolation so likes/comments do not replace media
+or shift the feed. Capture now offers a safe-area-aware familiar camera workspace,
+Photo/Video selector, gallery picker, working front/rear switch, front-only preview
+mirroring, usable-frame gating, explicit camera/microphone permission explanations,
+denial/busy/revocation states and track cleanup. Native still output remains
+high-resolution; fallback uses intrinsic frame dimensions and preview-matched native
+still settings. Camera controls are fixed above mobile navigation while active.
+
+Actual checks: backend **148 passed** with real PostgreSQL/MinIO/FFmpeg (two
+existing adapter deprecation warnings); backend Ruff/format/mypy and Alembic drift
+check passed. Frontend lint/typecheck, **36 unit/gateway tests**, production build,
+the existing 15 real-backend Chrome tests, and 3 new real-backend Chrome loading /
+camera tests passed. New camera checks use synthetic browser streams only; no
+physical Android/iPhone camera or keyboard/safe-area verification was performed.
+Deployment and production smoke evidence is recorded after the compatible backend
+and Cloudflare asset release complete. Rollback is the prior Render commit and
+previous Cloudflare Worker deployment; migration downgrade removes derivative
+metadata only and must not be used after thumbnails exist without cleanup.
+
 ## Cloudflare static frontend and immediate Render wake-up — 2026-11-03
 
 New canonical URL: https://mustaaaaaard-27.eeyramagbetor.workers.dev.
@@ -83,6 +124,60 @@ the entire 240s budget. Physical Android/iPhone capture and a second real Google
 account/invite acceptance remain unverified. README and docs/cloudflare-frontend.md
 contain deployment, exact Google/settings values and rollback to the preserved
 Render URL/known-good commit; no data/schema rollback is needed.
+
+## Private social release deployed and verified — 2026-11-02
+
+Live URL: https://mustaaaaaard-27.onrender.com. Deployed exact commit
+19e3ddf6431c908a66397c99b8ca1adb7fd7421c (feature 49425c4 plus join-test race fix),
+Render deployment dep-dbkgshqjnfac73c16scg. Corrected backend CI 41536477976 and
+frontend CI 41536477484 both completed successfully before deployment. Startup
+applied additive migration 0004 and readiness is 200. Verified Render Free,
+auto-deploy off, and every environment value unchanged before/after deployment.
+No Fly.io, paid plan, infrastructure or OAuth/storage-secret change.
+
+Ran the explicit seed-welcome CLI with the verified initial group UUID
+bad0f3b9-c9ff-4c6f-a563-56575993e367 and its existing Google-authenticated admin.
+Imported the supplied group selfie as the welcome cover plus 11 original photos
+in a single private carousel. Two supplied social-app UI screenshots excluded.
+One shared pinned parent, 11 hidden album children; system attribution, null
+member author and zero points. A second identical CLI invocation retained all 12
+post IDs and object records. Initial-group preexisting live-post set was preserved;
+no fake account/member post or normal-feed flood was created.
+
+Authenticated production checks used a distinct 15-minute session for the already
+verified existing Google owner. All 12 signed photo downloads were pixel-identical
+to EXIF-oriented decoded originals, with identical dimensions and no EXIF. No
+resize/recompression, private images in public assets, saved production screenshots,
+or credential output. Anonymous media API returned 401; unsigned R2 access denied.
+Public production Chrome login check passed: Google entry/self-hosted font/icons
+loaded, development form absent, /api/auth/dev=404. New public icons are monograms.
+
+Reused the existing isolated Deployment verification group for one synthetic
+gallery PNG. Verified PUT-like twice=1, DELETE-like twice=0, comment retry returns
+same ID/plain text, own comment deletion, zero-point leaderboard. Production Chrome
+passed welcome carousel navigation, literal comment rendering (no HTML), account
+tour completion, and no horizontal overflow at 320/390/1440px. No private image
+screenshots/traces were saved. Deleted the synthetic post via API, deleted only its
+known R2 object and released that upload reservation; retained tombstone/fingerprint.
+Temporary session revoked, original login preserved, prior tour completion state
+restored so the owner can still experience first-use onboarding. Welcome album
+and original live-post set confirmed preserved; environment values still unchanged.
+
+An initial production harness used the wrong saved verification-group suffix;
+its read-only assertion failed before importing or creating content. Corrected it
+by matching the single existing verification group, then the full run passed.
+No application change/redeployment was needed. Local owned MinIO/Vite/backend
+verification servers stopped; preexisting PostgreSQL left running.
+
+Evidence: 143 backend tests, 30 frontend unit tests, 12 real-backend browser tests,
+plus final four affected tests and five corrected browser-file tests passed locally;
+Ruff/format/mypy/lint/types/build/Alembic drift checks passed, both final Linux CI
+workflows passed. Physical Android/iPhone camera/keyboard/safe-area checks and a
+second real Google account are not automated verification. Previous personal-photo
+favicon bytes remain in older Git history; this release replaces current public
+assets and does not rewrite historical commits. Earlier deployment config/doc edits
+remain outside this feature's commits. This final release evidence is local progress
+documentation after the pinned production release; no additional app change.
 
 ## Private social redesign — 2026-11-02 (release preparation)
 

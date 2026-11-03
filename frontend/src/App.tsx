@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Camera, House, ChartNoAxesColumnIncreasing, UserRound, ArrowUpRight, LogOut, ChevronDown, Flame, ShieldCheck } from 'lucide-react'
@@ -98,7 +98,7 @@ export default function App() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
-  useEffect(() => { window.scrollTo(0, 0) }, [location.pathname])
+  useScrollMemory(location.pathname)
   const [selected, setSelected] = useState('')
   const [dirty, setDirty] = useState(false)
   const [joining, setJoining] = useState(() => !!new URLSearchParams(window.location.search).get('invite'))
@@ -164,4 +164,16 @@ function Nav() {
 
 export function SeasonSummary({ rank }: { rank: Parameters<typeof Stats>[0]['rank'] }) {
   return <section className="panel season-summary"><span className="eyebrow">A LITTLE EVERY DAY</span><h2>Your season, so far.</h2><Stats rank={rank} /><Countdowns /></section>
+}
+
+function useScrollMemory(path: string) {
+  const positions = useRef(new Map<string, number>())
+  useLayoutEffect(() => {
+    const target = positions.current.get(path) ?? 0
+    window.scrollTo(0, target)
+    const frame = requestAnimationFrame(() => window.scrollTo(0, target))
+    const remember = () => positions.current.set(path, window.scrollY)
+    window.addEventListener('scroll', remember, { passive: true })
+    return () => { cancelAnimationFrame(frame); window.removeEventListener('scroll', remember) }
+  }, [path])
 }

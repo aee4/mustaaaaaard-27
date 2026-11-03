@@ -97,6 +97,8 @@ class PostOut(BaseModel):
     like_count: int = 0
     liked: bool = False
     comment_count: int = 0
+    media_width: int | None = None
+    media_height: int | None = None
     album: list[uuid.UUID] = Field(default_factory=list)
 
 
@@ -184,6 +186,8 @@ class LeaderboardOut(BaseModel):
 class MediaOut(BaseModel):
     url: str
     expires_at: datetime
+    width: int | None = None
+    height: int | None = None
 
 
 class Ok(BaseModel):

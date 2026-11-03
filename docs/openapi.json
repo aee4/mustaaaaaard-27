@@ -3063,6 +3063,20 @@
             }
           },
           {
+            "name": "variant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "original",
+                "thumbnail"
+              ],
+              "type": "string",
+              "default": "original",
+              "title": "Variant"
+            }
+          },
+          {
             "name": "X-CSRF-Token",
             "in": "header",
             "required": false,
@@ -5169,6 +5183,28 @@
             "type": "string",
             "format": "date-time",
             "title": "Expires At"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
           }
         },
         "type": "object",
@@ -5301,6 +5337,28 @@
             "type": "integer",
             "title": "Comment Count",
             "default": 0
+          },
+          "media_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Width"
+          },
+          "media_height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Height"
           },
           "album": {
             "items": {

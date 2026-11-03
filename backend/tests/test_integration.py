@@ -118,7 +118,7 @@ def test_capture_gallery_points_feed_delete_and_private_access(
     service = UploadService(factory, storage, clock, client.app.state.settings)
     assert service.cleanup() == 1
     assert service.cleanup() == 0
-    assert len(storage.objects) == 1
+    assert len(storage.objects) == 2
     with factory.begin() as db:
         assert db.scalar(select(func.count()).select_from(Post)) == 2
 
@@ -195,7 +195,7 @@ def test_storage_partial_failure_retry_and_cleanup(client, admin, factory, stora
     clock.value += timedelta(minutes=6)
     assert service.cleanup() == 1
     assert upload(client, group, photo(), gallery=True, key="partial").status_code == 200
-    assert len(storage.objects) == 1
+    assert len(storage.objects) == 2
 
 
 def test_capture_expires_during_storage_io(client, admin, storage, clock, monkeypatch, factory):
@@ -239,7 +239,7 @@ def test_concurrent_duplicate_and_idempotency(factory, storage, clock, config, a
     )
     with factory.begin() as db:
         assert db.scalar(select(func.count()).select_from(Post)) == 1
-    assert len(storage.objects) == 1
+    assert len(storage.objects) == 2
 
 
 def test_two_simultaneous_posts_cannot_consume_one_capture(

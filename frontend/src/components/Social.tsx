@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Heart, MessageCircle, Pin, X } from 'lucide-react'
 import { api, type Group, type Post, type Session } from '../api/client'
-import { Avatar, ErrorBox, Loading } from './Common'
+import { Avatar, ErrorBox, Skeleton } from './Common'
 import { ghanaDate, ghanaTime } from '../lib/time'
-import { PrivateMedia } from '../pages/Season'
+import { PrivateMedia } from './PrivateMedia'
 
-export function Album({ group, post }: { group: string; post: Post }) {
+export function Album({ group, post, eager, priority }: { group: string; post: Post; eager?: boolean; priority?: boolean }) {
   const [index, setIndex] = useState(0)
   const photos = [post.id, ...(post.album ?? [])]
   return <div className="welcome-album" aria-label="Group welcome album">
-    <PrivateMedia key={photos[index]} group={group} post={{ ...post, id: photos[index] }} />
+    <PrivateMedia key={photos[index]} group={group} post={{ ...post, id: photos[index], media_width: index === 0 ? post.media_width : null, media_height: index === 0 ? post.media_height : null }} eager={eager} priority={priority} />
     {photos.length > 1 && <div className="album-controls"><button className="icon-button" aria-label="Previous welcome photo" disabled={index === 0} onClick={() => setIndex(index - 1)}><ChevronLeft /></button><span aria-live="polite">{index + 1} / {photos.length}</span><button className="icon-button" aria-label="Next welcome photo" disabled={index === photos.length - 1} onClick={() => setIndex(index + 1)}><ChevronRight /></button></div>}
   </div>
 }
@@ -53,10 +53,11 @@ function CommentsDialog({ group, post, session, close }: { group: Group; post: P
   const remove = useMutation({ mutationFn: (id: string) => api.deleteComment(group.id, post.id, id), onSuccess: refresh })
   useEffect(() => { const node = dialog.current!; const previous = document.activeElement as HTMLElement; node.showModal(); return () => { node.close(); previous?.focus() } }, [])
   return <dialog className="comments-dialog" ref={dialog} aria-labelledby="comments-title" onCancel={event => { event.preventDefault(); close() }} onClick={event => { if (event.target === event.currentTarget) close() }}><div className="sheet-handle" /><header><h2 id="comments-title">Comments</h2><button className="icon-button" aria-label="Close comments" onClick={close}><X /></button></header>
-    <div className="comments-list">{query.isPending && <Loading />}{query.isError && <ErrorBox error={query.error} retry={() => void query.refetch()} />}
+    <div className="comments-list">{query.isPending && <Skeleton kind="comments" />}{query.isError && <ErrorBox error={query.error} retry={() => void query.refetch()} />}
       {query.data?.pages.flatMap(page => page.items).map(comment => <article key={comment.id} className="comment"><Avatar name={comment.author.display_name} /><div><strong>{comment.author.display_name}</strong><p>{comment.text}</p><time dateTime={comment.created_at}>{ghanaTime(comment.created_at)} · {ghanaDate(comment.created_at)}</time>
         {(comment.author.id === session.user.id || group.role === 'admin') && <button className="text-button danger" disabled={remove.isPending} onClick={() => { if (window.confirm('Delete this comment?')) remove.mutate(comment.id) }}>Delete comment</button>}</div></article>)}
       {query.data?.pages[0].items.length === 0 && <p>No comments yet. Say hello.</p>}
+      {query.isFetchingNextPage && <Skeleton kind="comments" />}
       {query.hasNextPage && <button className="button" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>Earlier comments</button>}
     </div>{add.isError && <ErrorBox error={add.error} />}{remove.isError && <ErrorBox error={remove.error} />}
     <form className="comment-composer" onSubmit={event => { event.preventDefault(); if (sending.current || !text.trim() || Array.from(text.trim()).length > 500) return; sending.current = true; retry.current ??= { text: text.trim(), key: crypto.randomUUID() }; add.mutate() }}>

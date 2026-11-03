@@ -108,7 +108,7 @@ def ready(request: Request) -> Ok:
     try:
         with request.app.state.factory.begin() as db:
             revision = db.scalar(text("SELECT version_num FROM alembic_version"))
-            require(revision == "0004", 503, "not_ready", "Schema migration required")
+            require(revision == "0005", 503, "not_ready", "Schema migration required")
         request.app.state.storage.ready()
     except Exception as exc:
         raise Problem(503, "not_ready", "Database/schema/storage unavailable") from exc
@@ -401,7 +401,12 @@ def profile(group_id: uuid.UUID, user_id: uuid.UUID, request: Request, auth: Aut
 
 @router.get("/groups/{group_id}/posts/{post_id}/media", response_model=MediaOut)
 def media(
-    group_id: uuid.UUID, post_id: uuid.UUID, request: Request, response: Response, auth: Auth
+    group_id: uuid.UUID,
+    post_id: uuid.UUID,
+    request: Request,
+    response: Response,
+    auth: Auth,
+    variant: Literal["original", "thumbnail"] = "original",
 ) -> MediaOut:
     with request.app.state.factory.begin() as db:
         accounts.member(db, group_id, auth.user.id)
@@ -429,12 +434,19 @@ def media(
             "Media unavailable",
         )
         assert row is not None and row.object_key is not None
-        key = row.object_key
+        key = (
+            row.thumbnail_key
+            if variant == "thumbnail" and row.thumbnail_ready and row.thumbnail_key
+            else row.object_key
+        )
+        width, height = post.media_width, post.media_height
     seconds = request.app.state.settings.media_url_seconds
     response.headers["Cache-Control"] = "no-store"
     return MediaOut(
         url=request.app.state.storage.sign(key, seconds),
         expires_at=request.app.state.clock.now() + timedelta(seconds=seconds),
+        width=width,
+        height=height,
     )
 
 

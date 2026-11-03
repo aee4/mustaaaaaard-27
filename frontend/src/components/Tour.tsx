@@ -16,6 +16,8 @@ export function Tour({ user, dirty }: { user: string; dirty: boolean }) {
   const navigate = useNavigate()
   const status = useQuery({ queryKey: ['tour', user], queryFn: api.tour })
   const [replay, setReplay] = useState(false)
+  const [cameraError, setCameraError] = useState<unknown>(null)
+  const [enabling, setEnabling] = useState(false)
   const [step, setStep] = useState(0)
   const dialog = useRef<HTMLDialogElement>(null)
   const [rect, setRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
@@ -49,6 +51,18 @@ export function Tour({ user, dirty }: { user: string; dirty: boolean }) {
   return <dialog ref={dialog} className="tour-dialog" aria-labelledby="tour-title" onCancel={event => { event.preventDefault(); finish.mutate() }}>
     {rect && <><div className="tour-highlight" style={{ left: rect.x - 4, top: rect.y - 4, width: rect.width + 8, height: rect.height + 8 }} />
       <svg className="tour-arrow" aria-hidden="true"><defs><marker id="tour-arrowhead" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#ffcb3d" strokeWidth="2" /></marker></defs><path d={`M ${left + boxWidth / 2} ${rect.y > 280 ? top + 230 : top} Q ${left + boxWidth / 2 + 35} ${(top + rect.y) / 2} ${rect.x + rect.width / 2} ${rect.y > 280 ? rect.y - 9 : rect.y + rect.height + 9}`} stroke="#ffcb3d" strokeWidth="4" fill="none" markerEnd="url(#tour-arrowhead)" /></svg></>}
-    <section className="tour-tooltip" style={{ left, top, width: boxWidth }}><div className="tour-top"><span>{step + 1} of {steps.length}</span><button className="text-button" disabled={finish.isPending} onClick={() => finish.mutate()}>Skip</button></div><h2 id="tour-title">{steps[step].title}</h2><p>{steps[step].text}</p>{finish.isError && <ErrorBox error={finish.error} />}<div className="button-row"><button className="button" disabled={step === 0 || finish.isPending} onClick={() => go(step - 1)}>Back</button><button autoFocus className="button yellow" disabled={finish.isPending} onClick={() => step === steps.length - 1 ? finish.mutate() : go(step + 1)}>{step === steps.length - 1 ? 'Done' : 'Next'}</button></div></section>
+    <section className="tour-tooltip" style={{ left, top, width: boxWidth }}><div className="tour-top"><span>{step + 1} of {steps.length}</span><button className="text-button" disabled={finish.isPending} onClick={() => finish.mutate()}>Skip</button></div><h2 id="tour-title">{steps[step].title}</h2><p>{steps[step].text}</p>{step === 1 && <div className="camera-permission-note"><p>Camera access lets you capture photos here. The microphone is requested only for video.</p><button className="button yellow" disabled={enabling} onClick={async () => {
+      setEnabling(true); setCameraError(null)
+      try {
+        const permission = await navigator.permissions?.query({ name: 'camera' as PermissionName }).catch(() => null)
+        if (permission?.state === 'denied') throw new Error('Camera is blocked. Change browser settings or use the gallery.')
+        if (permission?.state !== 'granted') {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+          stream.getTracks().forEach(track => track.stop())
+        }
+        go(step + 1)
+      } catch { setCameraError(new Error('Camera access is unavailable. You can continue and share from the gallery.')) }
+      finally { setEnabling(false) }
+    }}>{enabling ? 'Enabling…' : 'Enable camera'}</button><button className="text-button" disabled={enabling} onClick={() => go(step + 1)}>Not now</button>{cameraError != null && <ErrorBox error={cameraError} />}</div>}{finish.isError && <ErrorBox error={finish.error} />}<div className="button-row"><button className="button" disabled={step === 0 || finish.isPending} onClick={() => go(step - 1)}>Back</button><button autoFocus className="button yellow" disabled={finish.isPending} onClick={() => step === steps.length - 1 ? finish.mutate() : go(step + 1)}>{step === steps.length - 1 ? 'Done' : 'Next'}</button></div></section>
   </dialog>
 }

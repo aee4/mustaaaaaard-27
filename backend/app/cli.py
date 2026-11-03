@@ -16,6 +16,15 @@ from app.services.uploads import UploadService
 cli = typer.Typer(no_args_is_help=True, pretty_exceptions_show_locals=False)
 
 
+@cli.command("backfill-thumbnails")
+def backfill_thumbnails() -> None:
+    """Create private derivatives for legacy live photos; preserve all originals."""
+    from app.services.thumbnails import backfill
+
+    config = get_settings()
+    typer.echo(f"thumbnails_created={backfill(SessionLocal, S3Storage(config), config)}")
+
+
 @cli.command("seed-welcome")
 def seed_welcome_command(
     group_id: UUID = typer.Option(...),
@@ -84,21 +93,32 @@ def reconcile_storage() -> None:
     with SessionLocal.begin() as db:
         pending = list(
             db.execute(
-                select(Upload.id, Upload.object_key).where(
+                select(Upload.id, Upload.object_key, Upload.thumbnail_key).where(
                     Upload.object_key.is_not(None), Upload.storage_bytes.is_(None)
                 )
             )
         )
     measured = 0
-    for upload_id, key in pending:
+    for upload_id, key, thumbnail_key in pending:
         assert key is not None
         # No DB transaction across object-storage IO. Missing/unreadable objects
         # deliberately remain unknown so quota enforcement continues to fail closed.
         size = int(storage.client.head_object(Bucket=config.s3_bucket, Key=key)["ContentLength"])
+        if thumbnail_key:
+            size += int(
+                storage.client.head_object(Bucket=config.s3_bucket, Key=thumbnail_key)[
+                    "ContentLength"
+                ]
+            )
         with SessionLocal.begin() as db:
             db.execute(text("SELECT pg_advisory_xact_lock(270003)"))
             row = db.get(Upload, upload_id, with_for_update=True)
-            if row and row.object_key == key and row.storage_bytes is None:
+            if (
+                row
+                and row.object_key == key
+                and row.thumbnail_key == thumbnail_key
+                and row.storage_bytes is None
+            ):
                 row.storage_bytes = size
                 measured += 1
     typer.echo(f"objects_measured={measured}")

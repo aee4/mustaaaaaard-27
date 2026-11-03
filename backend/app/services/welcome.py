@@ -14,7 +14,7 @@ from app.core.errors import require
 from app.integrations.storage import Storage
 from app.models.entities import Group, Post, Upload
 from app.services.identity import INITIAL_GROUP_NAME, member
-from app.services.media import copy_bounded, sanitize
+from app.services.media import copy_bounded, photo_thumbnail, sanitize
 from app.services.resources import reserve_storage
 
 
@@ -73,6 +73,7 @@ def seed_welcome(
                     with path.open("rb") as input_file:
                         fingerprint = copy_bounded(input_file, source, config.image_max_bytes)
                     clean, content_type = sanitize(source, directory, "photo", config)
+                    thumbnail, width, height = photo_thumbnail(clean, directory)
                     now, lease = clock.now(), uuid.uuid4()
                     with factory.begin() as db:
                         member(db, group_id, operator, admin=True, lock=True)
@@ -116,8 +117,16 @@ def seed_welcome(
                         db.flush()
                         upload_id, key = row.id, row.object_key
                     assert key is not None
-                    reserve_storage(factory, config, upload_id, lease, clean.stat().st_size)
+                    reserve_storage(
+                        factory,
+                        config,
+                        upload_id,
+                        lease,
+                        clean.stat().st_size + thumbnail.stat().st_size,
+                        key + "-thumb.webp",
+                    )
                     storage.put(key, clean, content_type)
+                    storage.put(key + "-thumb.webp", thumbnail, "image/webp")
                     with factory.begin() as db:
                         member(db, group_id, operator, admin=True, lock=True)
                         row = db.get(Upload, upload_id, with_for_update=True)
@@ -141,11 +150,14 @@ def seed_welcome(
                             kind="photo",
                             source="system",
                             content_type=content_type,
+                            media_width=width,
+                            media_height=height,
                             accepted_at=now,
                             activity_date=activity_date(now),
                         )
                         db.add(post)
                         row.state = "accepted"
+                        row.thumbnail_ready = True
                         db.flush()
                         if index == 0:
                             parent = post.id

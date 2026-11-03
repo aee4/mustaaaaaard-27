@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unicodedata
 import uuid
@@ -16,7 +17,7 @@ from app.integrations.storage import Storage
 from app.models.entities import Capture, Post, Upload
 from app.schemas.api import PostOut
 from app.services.identity import digest, member
-from app.services.media import copy_bounded, sanitize
+from app.services.media import copy_bounded, photo_thumbnail, sanitize
 from app.services.resources import media_gate, reserve_storage
 
 
@@ -38,6 +39,8 @@ def representation(post: Post) -> PostOut:
         caption=post.caption if post.removed_at is None else None,
         title=post.title,
         pinned=post.pinned,
+        media_width=post.media_width,
+        media_height=post.media_height,
     )
 
 
@@ -124,8 +127,23 @@ class UploadService:
                     "Another upload is processing. Retry this same upload shortly.",
                 )
                 clean, content_type = sanitize(original, directory, kind, self.config)
-                reserve_storage(self.factory, self.config, upload_id, lease, clean.stat().st_size)
+                thumbnail, width, height = (
+                    photo_thumbnail(clean, directory) if kind == "photo" else (None, None, None)
+                )
+                if kind == "video":
+                    width, height = json.loads((directory / "dimensions.json").read_text())
+                thumbnail_key = object_key + "-thumb.webp" if thumbnail else None
+                reserve_storage(
+                    self.factory,
+                    self.config,
+                    upload_id,
+                    lease,
+                    clean.stat().st_size + (thumbnail.stat().st_size if thumbnail else 0),
+                    thumbnail_key,
+                )
                 self.storage.put(object_key, clean, content_type)
+                if thumbnail and thumbnail_key:
+                    self.storage.put(thumbnail_key, thumbnail, "image/webp")
                 with self.factory.begin() as db:
                     member(db, group, user, lock=True)
                     row = db.get(Upload, upload_id, with_for_update=True)
@@ -162,6 +180,8 @@ class UploadService:
                         kind=kind,
                         source="capture" if capture else "gallery",
                         content_type=content_type,
+                        media_width=width,
+                        media_height=height,
                         fingerprint=fingerprint,
                         accepted_at=now,
                         activity_date=activity_date(now),
@@ -169,6 +189,7 @@ class UploadService:
                     )
                     db.add(post)
                     row.state = "accepted"
+                    row.thumbnail_ready = thumbnail is not None
                     db.flush()
                     result = representation(post)
                 return result
@@ -269,11 +290,14 @@ class UploadService:
                 row = db.get(Upload, upload_id, with_for_update=True)
                 if row is None or row.lease != lease or row.state != "processing":
                     return
+                thumbnail_key = row.thumbnail_key
                 row.state = "failed"
                 row.lease_until = self.clock.now()
             deleted = False
             try:
                 self.storage.delete(key)
+                if thumbnail_key:
+                    self.storage.delete(thumbnail_key)
                 deleted = True
             except Exception:
                 pass  # Tracked key remains cleanup debt.
@@ -281,6 +305,8 @@ class UploadService:
                 with self.factory.begin() as db:
                     row = db.get(Upload, upload_id, with_for_update=True)
                     if row and row.lease == lease and row.state == "failed":
+                        row.thumbnail_key = None
+                        row.thumbnail_ready = False
                         row.object_key = None
                         row.storage_bytes = 0
         except Exception:
@@ -317,14 +343,19 @@ class UploadService:
                 row.state, row.lease = "cleaning", uuid.uuid4()
                 row.lease_until = now + timedelta(seconds=self.config.lease_seconds)
                 upload_id, lease, key = row.id, row.lease, row.object_key
+                thumbnail_key = row.thumbnail_key
             assert key is not None
             try:
                 self.storage.delete(key)
+                if thumbnail_key:
+                    self.storage.delete(thumbnail_key)
             except Exception:
                 continue  # Lease expires and another cleanup can retry.
             with self.factory.begin() as db:
                 row = db.get(Upload, upload_id, with_for_update=True)
                 if row and row.lease == lease and row.state == "cleaning":
+                    row.thumbnail_key = None
+                    row.thumbnail_ready = False
                     row.object_key = None
                     row.storage_bytes = 0
                     post = db.scalar(select(Post.id).where(Post.upload_id == row.id))
@@ -337,7 +368,11 @@ class UploadService:
             if cleaned >= limit:
                 break
             with self.factory.begin() as db:
-                referenced = db.scalar(select(Upload.id).where(Upload.object_key == key))
+                referenced = db.scalar(
+                    select(Upload.id).where(
+                        (Upload.object_key == key) | (Upload.thumbnail_key == key)
+                    )
+                )
             if referenced is None:
                 try:
                     self.storage.delete(key)

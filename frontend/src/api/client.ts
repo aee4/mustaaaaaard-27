@@ -90,7 +90,7 @@ export const api = {
     return result
   },
   capture: (g: string, kind: Kind) => request<Capture>(`/groups/${g}/captures`, { method: 'POST', body: JSON.stringify({ kind }) }),
-  media: (g: string, p: string) => request<Media>(`/groups/${g}/posts/${p}/media`),
+  media: (g: string, p: string, variant: 'original' | 'thumbnail' = 'original') => request<Media>(`/groups/${g}/posts/${p}/media?variant=${variant}`, { signal: AbortSignal.timeout(20000) }),
   remove: (g: string, p: string) => request(`/groups/${g}/posts/${p}`, { method: 'DELETE' }),
   invite: (g: string, max_uses: number) => request<Invite>(`/groups/${g}/invites`, { method: 'POST', body: JSON.stringify({ max_uses, expires_in_hours: 72 }) }),
   revoke: (g: string, id: string) => request(`/groups/${g}/invites/${id}`, { method: 'DELETE' }),

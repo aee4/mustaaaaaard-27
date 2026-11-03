@@ -52,11 +52,11 @@ def test_storage_success_database_commit_failure_and_ambiguous_commit(
     assert failure.value.status == 503
     with factory.begin() as db:
         assert db.scalar(select(func.count()).select_from(Post)) == int(after)
-    assert len(storage.objects) == int(after)
+    assert len(storage.objects) == 2 * int(after)
     recovered = UploadService(factory, storage, clock, config).accept(
         user, group, "photo", None, "commit", io.BytesIO(photo())
     )
-    assert recovered.id and len(storage.objects) == 1
+    assert recovered.id and len(storage.objects) == 2
 
 
 def test_database_outage_leaves_tracked_object_for_cleanup(admin, factory, storage, clock, config):
@@ -66,7 +66,7 @@ def test_database_outage_leaves_tracked_object_for_cleanup(admin, factory, stora
         UploadService(faulty, storage, clock, config).accept(
             user, group, "photo", None, "outage", io.BytesIO(photo())
         )
-    assert len(storage.objects) == 1
+    assert len(storage.objects) == 2
     with factory.begin() as db:
         row = db.scalar(select(Upload))
         assert row.state == "processing" and row.object_key in storage.objects
@@ -83,11 +83,11 @@ def test_orphan_inventory_reconciliation_preserves_live_objects(
     user, group = admin
     service = UploadService(factory, storage, clock, config)
     service.accept(user, group, "photo", None, "live", io.BytesIO(photo()))
-    live_key = next(iter(storage.objects))
+    live_keys = set(storage.objects)
     storage.objects["media/late-stale-write"] = b"orphan"
     monkeypatch.setattr(storage, "old_keys", lambda before: iter(list(storage.objects)))
     assert service.cleanup() == 1
-    assert set(storage.objects) == {live_key}
+    assert set(storage.objects) == live_keys
     assert service.cleanup() == 0
 
 

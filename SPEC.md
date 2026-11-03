@@ -201,3 +201,11 @@ reconciles unreferenced keys after 15 minutes, covering delayed stale-worker wri
 Fingerprints remain in the database. Health is liveness; readiness checks
 DB schema revision and private bucket availability. Production rejects defaults,
 dev auth, insecure cookies, non-HTTPS origin/base URL, missing Google credentials.
+
+Photos retain their sanitized private original. Each accepted photo also receives a
+private WebP display derivative, counted in storage bytes and object quota, cleaned
+with its original, and served only through the existing active-membership media
+authorization route. Feed cards use the derivative; opening a photo fetches its
+original. Intrinsic dimensions are returned for layout reservation. Legacy photos
+are backfilled by the resumable operator command; a failed derivative upload remains
+tracked and no original, fingerprint, caption, score or post identity is altered.

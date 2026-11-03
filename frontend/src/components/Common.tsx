@@ -30,3 +30,10 @@ export function Countdowns() {
   return <div className="countdowns"><span><Clock3 size={15} /> Today ends in <b>{value?.day || 'syncing…'}</b></span>
     <span>Week ends in <b>{value?.week || 'syncing…'}</b></span><small>Africa/Accra · server-synced</small></div>
 }
+
+export function Skeleton({ kind }: { kind: 'feed' | 'profile' | 'leaderboard' | 'comments' }) {
+  return <div className={`loading-skeleton ${kind}`} role="status" aria-label={`Loading ${kind}`}>
+    <span className="sr-only">Loading {kind}</span>
+    {Array.from({ length: kind === 'feed' ? 2 : 3 }, (_, i) => <div className="skeleton-row" key={i} aria-hidden="true"><div className="skeleton skeleton-avatar" /><div className="skeleton skeleton-line" />{kind === 'feed' && <div className="skeleton skeleton-photo" />}</div>)}
+  </div>
+}

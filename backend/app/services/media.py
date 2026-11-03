@@ -404,4 +404,27 @@ def sanitize_video(source: Path, directory: Path, config: Settings) -> tuple[Pat
         )
     except (KeyError, ValueError, TypeError) as exc:
         raise Problem(422, "invalid_media", "Invalid sanitized video") from exc
+    # Reuse validated probe metadata; no additional media decode or transaction.
+    rotation = next(
+        (
+            float(item.get("rotation", 0))
+            for item in video.get("side_data_list", [])
+            if "rotation" in item
+        ),
+        0,
+    )
+    width, height = int(video["width"]), int(video["height"])
+    if abs(rotation) % 180 == 90:
+        width, height = height, width
+    (directory / "dimensions.json").write_text(json.dumps([width, height]))
     return output, "video/mp4" if mp4 else "video/webm"
+
+
+def photo_thumbnail(source: Path, directory: Path) -> tuple[Path, int, int]:
+    """Private display derivative; original remains lossless and unchanged."""
+    with Image.open(source) as image:
+        width, height = image.size
+        image.thumbnail((960, 960), Image.Resampling.LANCZOS)
+        output = directory / "thumbnail.webp"
+        image.save(output, "WEBP", quality=82, method=4)
+    return output, width, height

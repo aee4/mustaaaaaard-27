@@ -628,6 +628,10 @@ export interface components {
              * Format: date-time
              */
             expires_at: string;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
         };
         /** Ok */
         Ok: {
@@ -695,6 +699,10 @@ export interface components {
              * @default 0
              */
             comment_count: number;
+            /** Media Width */
+            media_width?: number | null;
+            /** Media Height */
+            media_height?: number | null;
             /** Album */
             album?: string[];
         };
@@ -3070,7 +3078,9 @@ export interface operations {
     };
     media_groups__group_id__posts__post_id__media_get: {
         parameters: {
-            query?: never;
+            query?: {
+                variant?: "original" | "thumbnail";
+            };
             header?: {
                 "X-CSRF-Token"?: string | null;
             };

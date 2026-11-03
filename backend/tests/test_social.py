@@ -162,7 +162,7 @@ def test_welcome_private_album_idempotent_unpin_remove(
         photos.append(path)
     post = seed_welcome(factory, storage, config, clock, group, actor, photos)
     assert seed_welcome(factory, storage, config, clock, group, actor, photos) == post
-    assert len(storage.objects) == 3
+    assert len(storage.objects) == 6
     feed = client.get(f"/groups/{group}/feed").json()
     assert feed["items"] == []
     welcome = feed["pinned"]
