@@ -1,5 +1,89 @@
 # Progress
 
+## Cloudflare static frontend and immediate Render wake-up — 2026-11-03
+
+New canonical URL: https://mustaaaaaard-27.eeyramagbetor.workers.dev.
+Fallback/backend retained: https://mustaaaaaard-27.onrender.com. Cloudflare Worker
+deployment `0e09816c6b8b428f9a711b00a3815d11` publishes the final static bundle and
+fixed-backend streaming gateway. Render deployment `dep-dbkobuei0phs73as02u0` is live
+at `23bced5e8cd8ce837e5c1aa529e5c6c9fd1c3616`. Render remains Free/auto-deploy off;
+existing Neon and private R2 are reused. No domain purchase, plan upgrade,
+subscription activation, schema revision, secret rotation or scheduled keep-alive.
+Cloudflare billing subscription reads are unavailable to the OAuth connector;
+no billing endpoint was modified. Static delivery uses the free asset service.
+
+Read AGENTS, deployment configs/evaluation, README/SPEC and existing progress first.
+Latest explicit deployment authorization overrides the older no-deploy project rule.
+Retained earlier uncommitted deployment/photo documentation/config and local skill
+files. Application commits are 91b540e and 23bced5; subsequent verification/docs
+changes do not alter the deployed application. Existing data/media were not moved.
+
+Readiness starts before React render on every document/entry route. One controller
+uses uncached JSON ok=true probes, 12s request budgets, 1..8s backoff, 120s overall
+timeout, cancellation and explicit Retry. Login waits for readiness plus initial
+session resolution; API actions reject before sending while connecting. Cached
+interface/navigation/local drafts remain usable on later failures. Recovery refetches
+safe queries only; explicit mutation/upload retries retain existing keys/bytes.
+Gateway forwards streams directly to only the configured Render origin, keeps
+Origin/cookies/CSRF/idempotency, handles redirects manually and never caches API/auth.
+Render HTML is converted to not-ready JSON; interrupted Google navigation returns
+to static UI with a tab-local relative destination (no auth tokens in browser storage).
+Preview URLs disabled; alternate-origin production API/auth denied. No persistent
+Worker request logs, browser secrets or private media in public artifacts.
+
+Merged only BASE_URL, exact ALLOWED_ORIGINS, BACKEND_HOSTS and explicit secure/dev
+auth flags into Render; secrets preserved. Both origins remain allowed for fallback.
+User added the exact Cloudflare Google origin/callback and confirmed real Google
+sign-in opens the existing group. Automated initiation checked the correct callback
+and secure cookie on both hosts. OAuth relative destinations/invites survive login;
+state/nonce/PKCE, host-only HttpOnly Secure Lax cookies and CSRF are preserved.
+R2 CORS now permits precisely the new and old origins. Signed GETs force private,
+no-store even for preexisting objects, without rewriting those objects.
+
+Actual local checks: **147 backend tests**, no skips, real PostgreSQL18/MinIO/FFmpeg;
+33 frontend unit tests; four gateway tests; **15 real-backend Chrome browser tests**.
+Ruff/format/mypy, ESLint/types, production build passed. OpenAPI matches all 25
+checked-in paths; API types regenerated with no contract change. Linux CI passed:
+backend run 41593132059, frontend 41593132009, both exact deployed commit. Earlier
+91b540e Linux workflows also passed. Three further read-only readiness browser
+tests passed on hosted Cloudflare with simulated HTML/unavailable readiness,
+timeout/Retry and auth destination restoration. Production compiled login, font
+and icons passed in Chrome156; dev form absent. Test-only failures caught a session
+bootstrap/login race and missing disabled-link role, both corrected. A camera
+navigation run interrupted during live source edits was rerun successfully with
+stable source; the final full run passed 15/15 in 46.2s.
+
+Production acceptance reused the existing Google owner and Deployment verification
+group with a distinct temporary session. Verified session/CSRF and production dev
+auth denial; invite creation/existing-member join/revocation; captured photo=1,
+video=3, gallery=0; normalized plain captions; same-key replay; feed, weekly/all
+rankings=4, idempotent likes/comment retry/deletion. **50 MiB synthetic MP4 plus
+multipart overhead passed through the gateway and replayed successfully.** A real
+slow streamed multipart photo completed **200 in 130.1s**, same-key replay=200;
+Neon showed zero idle-in-transaction sessions during streaming. Signed R2 Range
+returned 206/exact-origin CORS/no-store; unsigned requests denied. Authenticated
+production Chrome verified HttpOnly session, CSRF rejection and actual private R2
+video playback. No private screenshots/traces or cookie/media/signed-URL logs.
+
+Cleanup confirmed all four synthetic posts removed/captions cleared, their R2
+objects deleted (HEAD404), reservations released, temporary invite revoked and
+test session revoked. Fingerprints/tombstones remain; original live-post/session
+sets preserved and verification-group rankings returned to baseline. User's new
+real Google session and original Render sessions remain available. Local cleanup
+removed 83 accumulated synthetic MinIO objects after browser tests.
+Owned local Vite/Uvicorn/MinIO/PostgreSQL verification services were stopped;
+production Render/Cloudflare/Neon/R2 were left available.
+
+Limits: hosted readiness failure tests are simulated. Initial real gateway 429/
+non-JSON responses and read timeouts later recovered to readiness200, but provider
+sleep/wake timing was not independently confirmed. No forced production sleep or
+active-user interruption. This improves waiting; Render Free cold starts remain.
+The 130.1s test proves streaming duration, not >125s silent backend processing or
+the entire 240s budget. Physical Android/iPhone capture and a second real Google
+account/invite acceptance remain unverified. README and docs/cloudflare-frontend.md
+contain deployment, exact Google/settings values and rollback to the preserved
+Render URL/known-good commit; no data/schema rollback is needed.
+
 ## Private social redesign — 2026-11-02 (release preparation)
 
 Read the explicit pasted request, AGENTS/SPEC/progress and current capture/feed/

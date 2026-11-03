@@ -10,6 +10,26 @@ project `morning-shape-51677264`, existing private R2 bucket
 `mustaaaaaard-production`. No schema revision, secret rotation or data migration.
 See PROGRESS.md for actual deployed versions, checks and remaining limitations.
 
+Released 2026-11-03: backend commit `23bced5e8cd8ce837e5c1aa529e5c6c9fd1c3616`,
+Render deployment `dep-dbkobuei0phs73as02u0`; Cloudflare deployment
+`0e09816c6b8b428f9a711b00a3815d11` contains the matching final static bundle/gateway.
+The user added both Google entries and confirmed actual Google login opens the
+existing group on the Cloudflare origin. Original Render callback remains verified.
+Linux backend/frontend CI passed for this release (runs 41593132059/41593132009).
+Production synthetic acceptance also passed sessions/CSRF, invite token handling,
+photo=1/video=3/gallery=0, replay, feed/rankings, likes/comments and signed Range/CORS.
+Authenticated Chrome played the private R2 video. All four synthetic posts/objects,
+temporary invite/session and reservations were cleaned; original posts/sessions
+were preserved. The initial group still had all 12 original welcome/album posts.
+
+Local verification: 147 backend tests with real PostgreSQL/MinIO/FFmpeg, 33 frontend
+unit tests, four gateway tests and 15 real-backend Chrome tests passed. Ruff,
+format check, mypy, ESLint, TypeScript, production build and regenerated API types
+passed; current OpenAPI matches all 25 checked-in paths. Three additional read-only
+browser tests passed against deployed Cloudflare with simulated HTML/unavailable
+readiness, timeout/Retry and intended-destination restoration. No physical-device
+capture was claimed. The compiled production login/font/icons check passed.
+
 ## Routing and limits
 
 `frontend/wrangler.jsonc` publishes Vite dist as Workers Static Assets, with SPA
@@ -34,8 +54,12 @@ backend's receive guard. Cloudflare's 100MB incoming request allowance exceeds
 this envelope. Client media timeout remains 240s; FFmpeg budget remains 120s.
 Workers document no fixed wall-time limit while clients remain connected, but
 ordinary Cloudflare origin connections document 125s read/30s write limits.
-An actual >125s upload/processing route must be measured before claiming the
-entire 240s budget works. A synthetic local test cannot prove provider limits.
+Actual production gateway acceptance passed for a 50 MiB synthetic MP4 (plus
+multipart overhead) and its same-key replay. A separate real streamed multipart
+upload completed with 200 in **130.1 seconds**, followed by same-key replay=200.
+This verifies a long streaming request, not 130s of processing after a completed
+upload. The entire 240s client/processing budget and an origin staying silent for
+>125s remain unverified. A synthetic local test cannot prove provider limits.
 Do not lower media limits, buffer uploads, purchase a timeout upgrade or silently
 switch to cross-site cookie authentication to work around a failed test.
 
@@ -97,6 +121,22 @@ R2 GET/HEAD/Range CORS permits exactly these two origins, without wildcards.
 5. Complete actual Google login and isolated upload/social/playback acceptance on
    the Cloudflare origin. Remove synthetic posts and objects, revoke temporary
    sessions, retain fingerprints/tombstones. Only then promote links to the new URL.
+
+Read-only hosted browser regression:
+
+```powershell
+npm.cmd exec --prefix frontend -- playwright test --config frontend/playwright.cloudflare.config.ts
+```
+
+This configuration selects only readiness scenarios. The ordinary browser suite
+mutates its disposable backend and must stay on loopback. Production operator
+acceptance uses `uv run --directory backend python -m scripts.cloudflare_verify`,
+an existing Google owner, a temporary session and the existing dedicated verification
+group. Connection input is hidden; it never prints cookies, media or signed URLs.
+It checks photo/video/gallery scoring, replay, CSRF, private Range/CORS, social
+operations and cleans its own content/reservations while retaining tombstones.
+Its optional `preflight` input does only reads. The browser session helper receives
+its temporary cookie through stdin and never saves private screenshots or traces.
 
 ## Rollback
 

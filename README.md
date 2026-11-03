@@ -87,7 +87,8 @@ Vite binds loopback and proxies `/api/*` to backend paths without the `/api` pre
 mutations add the in-memory session CSRF token and preserve browser Origin. Keep
 `ALLOWED_ORIGINS` including `http://localhost:3000`. For Google configuration, set
 backend `BASE_URL=http://localhost:3000` locally (HTTPS frontend origin in production)
-and register its `/auth/google/callback`. Real Google login remains unverified.
+and register its `/auth/google/callback`. Real production Google login is confirmed
+on the Cloudflare origin; local Google configuration is independent.
 The UI shows development login only under Vite development mode **and**
 `VITE_DEV_LOGIN=true`; production builds never display it.
 
@@ -140,8 +141,8 @@ Build output is `frontend/dist`. `npm.cmd run preview --prefix frontend` preview
 the production build at localhost:3000 using the same API_TARGET proxy. Stop the
 dev server before previewing on that port. Vite's proxy is local development/
 preview infrastructure; a production server needs the documented same-origin
-HTTPS reverse proxy for `/api` and `/auth` plus SPA route fallback. No deployment
-configuration has been executed.
+HTTPS reverse proxy for `/api` and `/auth` plus SPA route fallback. The deployed
+Cloudflare gateway forwards those paths to Render's existing mounted web app.
 
 With production preview running on port 3000, `npm.cmd run test:production --prefix
 frontend` checks the compiled login screen in Chrome: Google entry exists and the
@@ -312,14 +313,15 @@ Set `ENVIRONMENT=production`, `DEV_AUTH=false`, a random `SECRET_KEY` >=32 chars
 Register Google web OAuth client with callback `BASE_URL/auth/google/callback`,
 set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Authlib uses discovery and
 verifies ID tokens, state/nonce and PKCE. Provider tokens are discarded, identity
-is Google's stable subject. Google consent/end-to-end login needs real credentials
-and has not been exercised here.
+is Google's stable subject. Real Google login and the existing group/session are
+confirmed on the hosted app; each new deployment still needs correct registration.
 
 Prefer frontend + `/auth` and API paths behind the same HTTPS origin. Cookies are
 HttpOnly, Secure in production, SameSite=Lax, host-only and path `/`. A separate
 cross-site frontend is unsupported by this topology. Use explicit CORS allowlist,
-not wildcard. No tokens in localStorage. Set proxy body limit to 51 MiB or less,
-request timeout >=240 seconds and bounded concurrency. Run Uvicorn with access logs
+not wildcard. No tokens in localStorage. Retain the 51 MiB request envelope,
+240-second client budget and bounded concurrency. See the Cloudflare guide for
+measured upload duration and remaining origin-processing timeout limits. Run Uvicorn with access logs
 off; never log signed URLs, cookies, bodies or OAuth callback query strings at the
 proxy. Trust forwarded client-IP headers only from your actual proxy (`--forwarded-allow-ips`);
 without it, auth IP limits see the proxy. Add TLS/HSTS at the proxy.
@@ -329,7 +331,8 @@ needed bucket object/head/list permissions. Bucket must prohibit anonymous reads
 listing. App does not change production IAM/policies. Configure TLS at the public
 object endpoint; browser media URLs must use HTTPS in production. Supply maintained
 FFmpeg/Pillow builds, DB backups, storage quotas and monitoring. Local Compose
-credentials are expressly development-only. No deployment has been performed.
+credentials are expressly development-only. Current production deployment and
+rollback evidence is in [the Cloudflare release guide](docs/cloudflare-frontend.md).
 
 ## Backups and restore
 

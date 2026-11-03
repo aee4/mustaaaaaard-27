@@ -8,6 +8,25 @@ commands and docs/frontend-verification.md for actual browser evidence. Optional
 captions are now supported through migration 0002 and the existing upload endpoints.
 Avatars are not in the API contract and are not fabricated by the UI.
 
+Production now uses Cloudflare Static Assets and a fixed Render gateway; the
+gateway preserves the `/api` prefix because Render mounts the API there (Vite's
+local proxy still strips it). See [deployment/rollback](cloudflare-frontend.md).
+Startup readiness runs once per document independently of React/routes, accepts
+only JSON ok=true and gates requests/login while reconnecting. The initial session
+check also completes before login is enabled. Later failures restart this bounded
+controller; recovery invalidates safe queries, never replays mutations automatically.
+
+GET `/auth/google?return_to=...` accepts a relative app destination (max2048;
+no external origins, leading //, backslashes or controls). The destination and
+chosen exact allowed application origin live in the signed HttpOnly OAuth cookie;
+state/nonce/PKCE remain unchanged. The callback returns to that destination after
+creating the normal session. A tab-local sessionStorage entry contains only the
+relative intended URL so an unavailable auth endpoint can return to the static
+interface without displaying Render HTML; authentication tokens stay in HttpOnly
+cookies and CSRF stays in memory. Invitation links still use InviteOut.token and
+the current browser origin; there is no invented invitation URL response field.
+Signed media GET responses use private,no-store, including preexisting objects.
+
 New videos: 5–30 seconds inclusive, <=50 MiB, shorter encoded edge <=720px and
 longer edge <=1280px. MP4: 8-bit H.264 Baseline/Main/High with optional AAC-LC;
 WebM: 8-bit VP8/VP9 with optional Opus/Vorbis. Unsupported codecs/resolutions

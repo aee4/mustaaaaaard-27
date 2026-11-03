@@ -260,6 +260,22 @@ def run() -> None:
                     if row["user"]["id"] == str(user.id)
                 )
                 assert own["points"] == 4
+            browser_check = subprocess.run(
+                [
+                    "node",
+                    str(
+                        Path(__file__).resolve().parents[2]
+                        / "frontend/scripts/check-cloudflare-session.mjs"
+                    ),
+                ],
+                input=json.dumps(
+                    {"cookie": cookie, "group": str(group.id), "post": created[1]}
+                ).encode(),
+                capture_output=True,
+                check=True,
+                timeout=90,
+            )
+            print(browser_check.stdout.decode().strip(), flush=True)
             p = g + f"/posts/{created[0]}"
             assert request("PUT", p + "/like")["like_count"] == 1
             assert request("PUT", p + "/like")["like_count"] == 1

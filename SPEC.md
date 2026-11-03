@@ -177,7 +177,8 @@ React assets are hosted independently on Cloudflare. A fixed-upstream same-origi
 gateway forwards /api and Google /auth without caching, redirect following or body
 buffering. Preview origins cannot use production API/auth. Render retains its old
 frontend as a fallback; host-only cookies remain distinct between the two origins.
-Public invitations use configured BASE_URL. Existing sessions/data/media remain.
+Public invitations use the browser origin; BASE_URL sets the canonical OAuth
+default. Existing sessions/data/media remain.
 
 On every document entry, before rendering, one shared readiness controller sends
 uncached /api/ready requests. Only successful JSON with ok=true is ready; HTML,
